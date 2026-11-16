@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="todonow"
         android:name="${applicationName}"
@@ -31,6 +33,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <receiver
+            android:name=".LockScreenNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.todonow.ACTION_ADD_TODO" />
+                <action android:name="com.example.todonow.ACTION_COMPLETE_TODO" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

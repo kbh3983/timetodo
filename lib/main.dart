@@ -2,40 +2,259 @@ import 'dart:ui' as ui;
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'camera_page.dart';
+import 'lockscreen_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await initializeDateFormatting('ko', null);
+  } catch (_) {}
+  await ThemeController.instance.init();
+  await LockScreenNotificationService.instance.init();
   runApp(const ChronosApp());
 }
+
+class AppTheme {
+  final String id;
+  final String name;
+  final Color scaffoldBg;
+  final Color cardBg;
+  final Color surfaceBg;
+  final Color accent;
+  final bool isDark;
+
+  const AppTheme({
+    required this.id,
+    required this.name,
+    required this.scaffoldBg,
+    required this.cardBg,
+    required this.surfaceBg,
+    required this.accent,
+    this.isDark = true,
+  });
+
+  Color get textPrimary => isDark ? Colors.white : const Color(0xFF0F172A);
+  Color get textSecondary => isDark ? Colors.white70 : const Color(0xFF475569);
+  Color get textTertiary => isDark ? Colors.white38 : const Color(0xFF94A3B8);
+  Color get textColor => textPrimary;
+  Color get cardBorder =>
+      isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0);
+}
+
+class ThemeController extends ChangeNotifier {
+  static final ThemeController instance = ThemeController._();
+  ThemeController._();
+
+  static const List<AppTheme> themes = [
+    // Dark Themes
+    AppTheme(
+      id: 'obsidian',
+      name: 'Obsidian Dark',
+      scaffoldBg: Color(0xFF0D0F14),
+      cardBg: Color(0xFF161922),
+      surfaceBg: Color(0xFF232832),
+      accent: Color(0xFF6366F1),
+      isDark: true,
+    ),
+    AppTheme(
+      id: 'oled',
+      name: 'Midnight OLED',
+      scaffoldBg: Color(0xFF000000),
+      cardBg: Color(0xFF0E0E12),
+      surfaceBg: Color(0xFF1A1A22),
+      accent: Color(0xFF6366F1),
+      isDark: true,
+    ),
+    AppTheme(
+      id: 'navy',
+      name: 'Deep Navy',
+      scaffoldBg: Color(0xFF080D1A),
+      cardBg: Color(0xFF0F172A),
+      surfaceBg: Color(0xFF1E293B),
+      accent: Color(0xFF38BDF8),
+      isDark: true,
+    ),
+    AppTheme(
+      id: 'forest',
+      name: 'Forest Charcoal',
+      scaffoldBg: Color(0xFF0A130E),
+      cardBg: Color(0xFF112217),
+      surfaceBg: Color(0xFF1B3325),
+      accent: Color(0xFF10B981),
+      isDark: true,
+    ),
+    AppTheme(
+      id: 'purple',
+      name: 'Cyber Violet',
+      scaffoldBg: Color(0xFF120D1D),
+      cardBg: Color(0xFF1E152F),
+      surfaceBg: Color(0xFF2E2047),
+      accent: Color(0xFFA855F7),
+      isDark: true,
+    ),
+
+    // Light Themes
+    AppTheme(
+      id: 'clean_white',
+      name: 'Clean White',
+      scaffoldBg: Color(0xFFF8FAFC),
+      cardBg: Color(0xFFFFFFFF),
+      surfaceBg: Color(0xFFF1F5F9),
+      accent: Color(0xFF4F46E5),
+      isDark: false,
+    ),
+    AppTheme(
+      id: 'warm_cream',
+      name: 'Warm Cream',
+      scaffoldBg: Color(0xFFFDFBF7),
+      cardBg: Color(0xFFFFFFFF),
+      surfaceBg: Color(0xFFF5EFE6),
+      accent: Color(0xFFD97706),
+      isDark: false,
+    ),
+    AppTheme(
+      id: 'nordic_frost',
+      name: 'Nordic Frost',
+      scaffoldBg: Color(0xFFF0F4F8),
+      cardBg: Color(0xFFFFFFFF),
+      surfaceBg: Color(0xFFE2E8F0),
+      accent: Color(0xFF0284C7),
+      isDark: false,
+    ),
+    AppTheme(
+      id: 'soft_rose',
+      name: 'Soft Rose',
+      scaffoldBg: Color(0xFFFFF5F7),
+      cardBg: Color(0xFFFFFFFF),
+      surfaceBg: Color(0xFFFFE4E8),
+      accent: Color(0xFFE11D48),
+      isDark: false,
+    ),
+  ];
+
+  String _currentThemeId = 'obsidian';
+  String get currentThemeId => _currentThemeId;
+
+  int? _customAccentValue;
+  Color? get customAccent =>
+      _customAccentValue != null ? Color(_customAccentValue!) : null;
+
+  double _gradientIntensity = 0.28;
+  double get gradientIntensity => _gradientIntensity;
+
+  AppTheme get currentTheme {
+    final base = themes.firstWhere(
+      (t) => t.id == _currentThemeId,
+      orElse: () => themes.first,
+    );
+    if (_customAccentValue != null) {
+      return AppTheme(
+        id: base.id,
+        name: base.name,
+        scaffoldBg: base.scaffoldBg,
+        cardBg: base.cardBg,
+        surfaceBg: base.surfaceBg,
+        accent: Color(_customAccentValue!),
+        isDark: base.isDark,
+      );
+    }
+    return base;
+  }
+
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('chronos_theme_id');
+    if (saved != null && themes.any((t) => t.id == saved)) {
+      _currentThemeId = saved;
+    }
+    _customAccentValue = prefs.getInt('chronos_custom_accent');
+    _gradientIntensity = prefs.getDouble('chronos_gradient_intensity') ?? 0.28;
+    notifyListeners();
+  }
+
+  Future<void> setTheme(String id) async {
+    if (_currentThemeId == id) return;
+    _currentThemeId = id;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('chronos_theme_id', id);
+  }
+
+  Future<void> setCustomAccent(Color? color) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (color == null) {
+      _customAccentValue = null;
+      await prefs.remove('chronos_custom_accent');
+    } else {
+      _customAccentValue = color.value;
+      await prefs.setInt('chronos_custom_accent', color.value);
+    }
+    notifyListeners();
+  }
+
+  Future<void> setGradientIntensity(double intensity) async {
+    _gradientIntensity = intensity.clamp(0.0, 1.0);
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('chronos_gradient_intensity', _gradientIntensity);
+  }
+}
+
+AppTheme get appTheme => ThemeController.instance.currentTheme;
+bool get isAppDark => ThemeController.instance.currentTheme.isDark;
+Color get appText => isAppDark ? Colors.white : const Color(0xFF0F172A);
+Color get appTextSecondary =>
+    isAppDark ? Colors.white.withOpacity(0.65) : const Color(0xFF475569);
+Color get appTextTertiary =>
+    isAppDark ? Colors.white.withOpacity(0.4) : const Color(0xFF94A3B8);
+Color get appCardBg => ThemeController.instance.currentTheme.cardBg;
+Color get appSubtleBg =>
+    isAppDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.04);
+Color get appBorder =>
+    isAppDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
 
 class ChronosApp extends StatelessWidget {
   const ChronosApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Chronos Timestamp',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0D0F14),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6366F1),
-          brightness: Brightness.dark,
-          surface: const Color(0xFF161922),
-          primary: const Color(0xFF6366F1),
-        ),
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-      ),
-      home: const MainNavigation(),
+    return AnimatedBuilder(
+      animation: ThemeController.instance,
+      builder: (context, _) {
+        final theme = ThemeController.instance.currentTheme;
+        final isDark = theme.isDark;
+        return MaterialApp(
+          title: 'Chronos Timestamp',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: isDark ? Brightness.dark : Brightness.light,
+            scaffoldBackgroundColor: theme.scaffoldBg,
+            cardColor: theme.cardBg,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: theme.accent,
+              brightness: isDark ? Brightness.dark : Brightness.light,
+              surface: theme.cardBg,
+              primary: theme.accent,
+            ),
+            textTheme: GoogleFonts.interTextTheme(
+              isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
+            ),
+          ),
+          home: const MainNavigation(),
+        );
+      },
     );
   }
 }
@@ -47,7 +266,8 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObserver {
+  final GlobalKey<_HomePageState> _homePageKey = GlobalKey<_HomePageState>();
   int _selectedIndex = 0;
   List<TimestampEntry> _entries = [];
   double _uiScale = 0.9; // Default to 0.9 for a smaller, cleaner look
@@ -57,6 +277,7 @@ class _MainNavigationState extends State<MainNavigation> {
   Map<String, Color> _categoryIndicatorColors = {
     'General': const Color(0xFF6366F1),
   };
+  String _defaultCategory = 'General';
 
   List<String> get _categories => _categoryIndicatorColors.keys.toList();
 
@@ -64,29 +285,87 @@ class _MainNavigationState extends State<MainNavigation> {
     return _categoryIndicatorColors[category] ?? const Color(0xFF64748B);
   }
 
+  bool _lockScreenTodoEnabled = true;
+  bool _deadlineAlertsEnabled = true;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    LockScreenNotificationService.onEntriesUpdatedExternally = () {
+      if (mounted) {
+        _loadEntries();
+      }
+    };
+
+    // 잠금화면 알림 실시간 동기화 브로드캐스트 수신
+    if (Platform.isAndroid) {
+      const platform = MethodChannel('com.example.todonow/lockscreen');
+      platform.setMethodCallHandler((call) async {
+        if (call.method == 'onEntriesUpdatedExternally') {
+          if (mounted) {
+            _loadEntries();
+          }
+        }
+      });
+    }
+
     _entriesNotifier = ValueNotifier<List<TimestampEntry>>([]);
     _loadCategories().then((_) => _loadEntries());
     _loadUiScale();
+    _loadLockScreenSetting();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadEntries();
+      _loadLockScreenSetting();
+    }
+  }
+
+  Future<void> _loadLockScreenSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    _lockScreenTodoEnabled =
+        prefs.getBool('chronos_lockscreen_todo_enabled') ?? true;
+    _deadlineAlertsEnabled =
+        prefs.getBool('chronos_deadline_alerts_enabled') ?? true;
+    _updateLockScreenNotification();
+  }
+
+  void _updateLockScreenNotification() {
+    LockScreenNotificationService.instance.updateTopTodo(
+      _entries,
+      enabled: _lockScreenTodoEnabled,
+      deadlineAlertsEnabled: _deadlineAlertsEnabled,
+    );
   }
 
   Future<void> _loadCategories() async {
     final prefs = await SharedPreferences.getInstance();
     final String? catsJson = prefs.getString('chronos_categories');
+    final String? savedDefault = prefs.getString('chronos_default_category');
     if (catsJson != null) {
       final Map<String, dynamic> decoded = jsonDecode(catsJson);
+      final Map<String, Color> loaded = decoded.map(
+        (key, value) => MapEntry(key, Color(value as int)),
+      );
       setState(() {
-        _categoryIndicatorColors = decoded.map(
-          (key, value) => MapEntry(key, Color(value as int)),
-        );
+        _categoryIndicatorColors = loaded.isNotEmpty
+            ? loaded
+            : {'General': const Color(0xFF6366F1)};
+        if (savedDefault != null && _categoryIndicatorColors.containsKey(savedDefault)) {
+          _defaultCategory = savedDefault;
+        } else {
+          _defaultCategory = _categoryIndicatorColors.keys.first;
+        }
       });
     } else {
       setState(() {
         _categoryIndicatorColors = {
           'General': const Color(0xFF6366F1),
         };
+        _defaultCategory = 'General';
       });
     }
   }
@@ -97,6 +376,7 @@ class _MainNavigationState extends State<MainNavigation> {
       (key, value) => MapEntry(key, value.value),
     );
     await prefs.setString('chronos_categories', jsonEncode(encoded));
+    await prefs.setString('chronos_default_category', _defaultCategory);
   }
 
   void _addCategory(String name, Color color) {
@@ -106,10 +386,83 @@ class _MainNavigationState extends State<MainNavigation> {
     _saveCategories();
   }
 
+  void _updateCategoryColor(String name, Color newColor) {
+    setState(() {
+      _categoryIndicatorColors[name] = newColor;
+    });
+    _saveCategories();
+  }
+
+  void _setDefaultCategory(String category) {
+    if (!_categoryIndicatorColors.containsKey(category)) return;
+    setState(() {
+      _defaultCategory = category;
+    });
+    _saveCategories();
+  }
+
+  void _reorderCategories(int oldIndex, int newIndex) {
+    final keys = _categoryIndicatorColors.keys.toList();
+    if (oldIndex < 0 || oldIndex >= keys.length) return;
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+    if (newIndex < 0 || newIndex >= keys.length) return;
+    final item = keys.removeAt(oldIndex);
+    keys.insert(newIndex, item);
+
+    final Map<String, Color> newMap = {};
+    for (final k in keys) {
+      newMap[k] = _categoryIndicatorColors[k]!;
+    }
+    setState(() {
+      _categoryIndicatorColors = newMap;
+    });
+    _saveCategories();
+  }
+
+  bool _renameCategory(String oldName, String newName) {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty || trimmed == oldName) return false;
+    if (_categoryIndicatorColors.containsKey(trimmed)) return false;
+
+    final color = _categoryIndicatorColors[oldName] ?? const Color(0xFF6366F1);
+    final Map<String, Color> newColors = {};
+    for (final entry in _categoryIndicatorColors.entries) {
+      if (entry.key == oldName) {
+        newColors[trimmed] = color;
+      } else {
+        newColors[entry.key] = entry.value;
+      }
+    }
+
+    setState(() {
+      _categoryIndicatorColors = newColors;
+      if (_defaultCategory == oldName) {
+        _defaultCategory = trimmed;
+      }
+      _entries = _entries.map((e) {
+        if (e.category == oldName) {
+          return e.copyWith(category: trimmed);
+        }
+        return e;
+      }).toList();
+      _entriesNotifier.value = List.from(_entries);
+    });
+    _saveCategories();
+    _saveEntries();
+    return true;
+  }
+
   void _deleteCategory(String category) {
     if (category == 'General') return;
     setState(() {
       _categoryIndicatorColors.remove(category);
+      if (_defaultCategory == category) {
+        _defaultCategory = _categoryIndicatorColors.keys.isNotEmpty
+            ? _categoryIndicatorColors.keys.first
+            : 'General';
+      }
       _entries.removeWhere((e) => e.category == category);
       _entriesNotifier.value = List.from(_entries);
     });
@@ -135,65 +488,640 @@ class _MainNavigationState extends State<MainNavigation> {
   void _showSettingsMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF161922),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
+      isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+        return AnimatedBuilder(
+          animation: ThemeController.instance,
+          builder: (context, _) {
+            return StatefulBuilder(
+              builder: (context, setSheetState) {
+                final currentTheme = ThemeController.instance.currentTheme;
+                final isDark = currentTheme.isDark;
+                final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+            Widget buildSectionHeader(String title, {bool isFirst = false}) {
+              return Padding(
+                padding: EdgeInsets.only(left: 4, bottom: 8, top: isFirst ? 0 : 20),
+                child: Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
                   ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      const Icon(Icons.display_settings_rounded, size: 20, color: Color(0xFF6366F1)),
-                      const SizedBox(width: 12),
-                      Text(
-                        'DISPLAY SETTINGS',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1,
-                          color: Colors.white,
+                ),
+              );
+            }
+
+            Widget buildGroupCard({required List<Widget> children}) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    for (int i = 0; i < children.length; i++) ...[
+                      if (i > 0)
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 16,
+                          endIndent: 16,
+                          color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06),
+                        ),
+                      children[i],
+                    ],
+                  ],
+                ),
+              );
+            }
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.88,
+              ),
+              decoration: BoxDecoration(
+                color: currentTheme.cardBg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 상단 드래그 핸들 (아래로 쓸어내리면 닫힘)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onVerticalDragUpdate: (details) {
+                        if (details.primaryDelta! > 6) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Adjust the overall scale of fonts and widgets.',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: Colors.white.withOpacity(0.4),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildScaleOption(context, 'Tiny', 0.8),
-                      _buildScaleOption(context, 'Compact', 0.9),
-                      _buildScaleOption(context, 'Standard', 1.0),
-                      _buildScaleOption(context, 'Large', 1.1),
-                    ],
-                  ),
-                ],
+                    const SizedBox(height: 12),
+
+                    // Compact Header (Identical to + button Add Sheet)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: currentTheme.accent.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.tune_rounded,
+                              size: 16,
+                              color: currentTheme.accent,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '설정',
+                            style: GoogleFonts.inter(
+                              fontSize: 18 * _uiScale,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              color: currentTheme.textPrimary,
+                            ),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 16,
+                                color: currentTheme.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    Expanded(
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification is OverscrollNotification &&
+                              notification.overscroll < -15) {
+                            Navigator.pop(context);
+                            return true;
+                          }
+                          return false;
+                        },
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(20, 0, 20, 28 + bottomPadding),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ------------------------------------------
+                              // 1. 화면 스타일
+                              // ------------------------------------------
+                              buildSectionHeader('화면 스타일', isFirst: true),
+                              buildGroupCard(
+                                children: [
+                                  // 테마 선택 가로 스크롤
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      physics: const BouncingScrollPhysics(),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                                      child: Row(
+                                        children: ThemeController.themes.map((theme) {
+                                          final isSelected = ThemeController.instance.currentThemeId == theme.id;
+                                          return Padding(
+                                            padding: const EdgeInsets.only(right: 10),
+                                            child: InkWell(
+                                              onTap: () {
+                                                ThemeController.instance.setTheme(theme.id);
+                                                setSheetState(() {});
+                                              },
+                                              borderRadius: BorderRadius.circular(14),
+                                              child: AnimatedContainer(
+                                                duration: const Duration(milliseconds: 180),
+                                                width: 108,
+                                                height: 66,
+                                                padding: const EdgeInsets.all(10),
+                                                decoration: BoxDecoration(
+                                                  color: theme.scaffoldBg,
+                                                  borderRadius: BorderRadius.circular(14),
+                                                  border: Border.all(
+                                                    color: isSelected
+                                                        ? theme.accent
+                                                        : (theme.isDark
+                                                            ? Colors.white.withOpacity(0.08)
+                                                            : Colors.black.withOpacity(0.08)),
+                                                    width: isSelected ? 2.0 : 1.0,
+                                                  ),
+                                                  boxShadow: isSelected
+                                                      ? [
+                                                          BoxShadow(
+                                                            color: theme.accent.withOpacity(0.3),
+                                                            blurRadius: 6,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ]
+                                                      : null,
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                      children: [
+                                                        Container(
+                                                          width: 14,
+                                                          height: 14,
+                                                          decoration: BoxDecoration(
+                                                            color: theme.accent,
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                        ),
+                                                        if (isSelected)
+                                                          Icon(
+                                                            Icons.check_circle_rounded,
+                                                            size: 15,
+                                                            color: theme.accent,
+                                                          )
+                                                        else
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(
+                                                                horizontal: 4, vertical: 1.5),
+                                                            decoration: BoxDecoration(
+                                                              color: theme.isDark
+                                                                  ? Colors.white.withOpacity(0.08)
+                                                                  : Colors.black.withOpacity(0.06),
+                                                              borderRadius: BorderRadius.circular(5),
+                                                            ),
+                                                            child: Text(
+                                                              theme.isDark ? 'DARK' : 'LIGHT',
+                                                              style: GoogleFonts.jetBrainsMono(
+                                                                fontSize: 8,
+                                                                fontWeight: FontWeight.w700,
+                                                                color: theme.isDark
+                                                                    ? Colors.white60
+                                                                    : const Color(0xFF64748B),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    ),
+                                                    Text(
+                                                      theme.name,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            isSelected ? FontWeight.w800 : FontWeight.w600,
+                                                        color: theme.isDark
+                                                            ? Colors.white
+                                                            : const Color(0xFF0F172A),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // 테마 포인트 색상
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 22,
+                                          height: 22,
+                                          decoration: BoxDecoration(
+                                            color: currentTheme.accent,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: isDark ? Colors.white30 : Colors.black12,
+                                              width: 1.5,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: currentTheme.accent.withOpacity(0.35),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            '포인트 색상',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: currentTheme.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        if (ThemeController.instance.customAccent != null) ...[
+                                          TextButton(
+                                            onPressed: () {
+                                              ThemeController.instance.setCustomAccent(null);
+                                              setSheetState(() {});
+                                            },
+                                            style: TextButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            child: Text(
+                                              '초기화',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 12,
+                                                color: currentTheme.textTertiary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                        ],
+                                        InkWell(
+                                          onTap: () async {
+                                            final picked = await showCustomColorPickerDialog(
+                                              context,
+                                              initialColor: currentTheme.accent,
+                                            );
+                                            if (picked != null) {
+                                              await ThemeController.instance.setCustomAccent(picked);
+                                              setSheetState(() {});
+                                            }
+                                          },
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: currentTheme.accent.withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: currentTheme.accent.withOpacity(0.25),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.colorize_rounded,
+                                                  size: 13,
+                                                  color: currentTheme.accent,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '색상 변경',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: currentTheme.accent,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // 배경 그라데이션
+                                  Padding(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              '배경 그라데이션',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: currentTheme.textPrimary,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${(ThemeController.instance.gradientIntensity * 100).round()}%',
+                                              style: GoogleFonts.jetBrainsMono(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: currentTheme.accent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          children: [
+                                            _buildGradientIntensityChip(context, 'OFF', 0.0, setSheetState),
+                                            const SizedBox(width: 6),
+                                            _buildGradientIntensityChip(context, '은은하게', 0.15, setSheetState),
+                                            const SizedBox(width: 6),
+                                            _buildGradientIntensityChip(context, '보통', 0.28, setSheetState),
+                                            const SizedBox(width: 6),
+                                            _buildGradientIntensityChip(context, '선명하게', 0.45, setSheetState),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              // ------------------------------------------
+                              // 2. 화면 및 글자 크기
+                              // ------------------------------------------
+                              buildSectionHeader('화면 및 글자 크기'),
+                              buildGroupCard(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'UI 및 글자 크기',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: currentTheme.textPrimary,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${(_uiScale * 100).toInt()}%',
+                                              style: GoogleFonts.jetBrainsMono(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: currentTheme.accent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          children: [
+                                            _buildScaleSegment(context, '작게', 0.8, setSheetState),
+                                            const SizedBox(width: 6),
+                                            _buildScaleSegment(context, '조금 작게', 0.9, setSheetState),
+                                            const SizedBox(width: 6),
+                                            _buildScaleSegment(context, '보통', 1.0, setSheetState),
+                                            const SizedBox(width: 6),
+                                            _buildScaleSegment(context, '크게', 1.1, setSheetState),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              // ------------------------------------------
+                              // 3. 알림 및 잠금화면
+                              // ------------------------------------------
+                              buildSectionHeader('알림 및 잠금화면'),
+                              buildGroupCard(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.lock_clock_outlined,
+                                          size: 20,
+                                          color: currentTheme.accent,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            '잠금화면 최우선 TODO',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: currentTheme.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        Switch(
+                                          value: _lockScreenTodoEnabled,
+                                          activeColor: currentTheme.accent,
+                                          onChanged: (val) async {
+                                            setState(() {
+                                              _lockScreenTodoEnabled = val;
+                                            });
+                                            setSheetState(() {});
+                                            final prefs = await SharedPreferences.getInstance();
+                                            await prefs.setBool('chronos_lockscreen_todo_enabled', val);
+                                            _updateLockScreenNotification();
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.notifications_active_outlined,
+                                          size: 20,
+                                          color: currentTheme.accent,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            '마감 알림 (D-3 ~ 마감일)',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: currentTheme.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        Switch(
+                                          value: _deadlineAlertsEnabled,
+                                          activeColor: currentTheme.accent,
+                                          onChanged: (val) async {
+                                            setState(() {
+                                              _deadlineAlertsEnabled = val;
+                                            });
+                                            setSheetState(() {});
+                                            final prefs = await SharedPreferences.getInstance();
+                                            await prefs.setBool('chronos_deadline_alerts_enabled', val);
+                                            _updateLockScreenNotification();
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              // ------------------------------------------
+                              // 4. 지원 및 정보
+                              // ------------------------------------------
+                              buildSectionHeader('지원 및 정보'),
+                              buildGroupCard(
+                                children: [
+                                  InkWell(
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _showCoffeeSupportDialog(context);
+                                    },
+                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                      child: Row(
+                                        children: [
+                                          const Text('☕️', style: TextStyle(fontSize: 18)),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              '개발자에게 커피 선물하기',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: currentTheme.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.chevron_right_rounded,
+                                            size: 20,
+                                            color: currentTheme.textTertiary,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info_outline_rounded,
+                                          size: 19,
+                                          color: currentTheme.textSecondary,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            '버전',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: currentTheme.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          '1.0.0',
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: currentTheme.textTertiary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            );
+              },
             );
           },
         );
@@ -201,8 +1129,289 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
+  void _showCoffeeSupportDialog(BuildContext parentContext) {
+    final theme = ThemeController.instance.currentTheme;
+    final isDark = theme.isDark;
+
+    showModalBottomSheet(
+      context: parentContext,
+      backgroundColor: theme.cardBg,
+      isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (context) {
+        final bottomPadding = MediaQuery.of(context).padding.bottom;
+        return SafeArea(
+          top: false,
+          child: Container(
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 28 + bottomPadding),
+            child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragUpdate: (details) {
+                  if (details.primaryDelta! > 7) {
+                    Navigator.pop(context);
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Text('☕️', style: TextStyle(fontSize: 24)),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '개발자에게 커피 한잔 선물하기',
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Chronos가 유용하셨다면 개발자를 응원해주세요!',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _buildSupportOption('☕️ 따뜻한 아메리카노', '₩2,500', '가벼운 카페인 충전과 따뜻한 응원'),
+              const SizedBox(height: 10),
+              _buildSupportOption('🧋 달콤한 바닐라 라떼', '₩4,500', '기분 좋은 에너지와 파이팅 부스트'),
+              const SizedBox(height: 10),
+              _buildSupportOption('🍰 커피 & 디저트 세트', '₩9,900', '밤샘 폭풍 코딩 & 신규 기능 지원'),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF38BDF8)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '현재 인앱 결제 및 광고 리워드(AdMob) 연동을 준비하고 있습니다. 오픈 전까지는 따뜻한 응원의 마음을 남겨주세요!',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          color: isDark ? Colors.white60 : const Color(0xFF475569),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Text('❤️', style: TextStyle(fontSize: 18)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '따뜻한 응원 감사합니다! 더 멋진 Chronos로 보답하겠습니다 ☕️',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: const Color(0xFF1E293B),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.favorite_rounded, color: Colors.pinkAccent, size: 18),
+                  label: Text(
+                    '마음으로 응원하기 ❤️',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+  }
+
+  Widget _buildSupportOption(String title, String price, String desc) {
+    final isDark = ThemeController.instance.currentTheme.isDark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  desc,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: isDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              price,
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFFF59E0B),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScaleSegment(
+    BuildContext context,
+    String label,
+    double scale,
+    StateSetter setSheetState,
+  ) {
+    bool isSelected = (_uiScale - scale).abs() < 0.01;
+    final currentTheme = ThemeController.instance.currentTheme;
+    final isDark = currentTheme.isDark;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          _saveUiScale(scale);
+          setSheetState(() {});
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? currentTheme.accent
+                : (isDark
+                    ? Colors.white.withOpacity(0.06)
+                    : Colors.black.withOpacity(0.05)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? currentTheme.accent
+                  : (isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : Colors.black.withOpacity(0.08)),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected
+                    ? (currentTheme.accent.computeLuminance() > 0.5
+                        ? Colors.black
+                        : Colors.white)
+                    : (isDark ? Colors.white70 : const Color(0xFF334155)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildScaleOption(BuildContext context, String label, double scale) {
     bool isSelected = (_uiScale - scale).abs() < 0.01;
+    final isDark = ThemeController.instance.currentTheme.isDark;
     return GestureDetector(
       onTap: () {
         _saveUiScale(scale);
@@ -214,10 +1423,14 @@ class _MainNavigationState extends State<MainNavigation> {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF6366F1) : const Color(0xFF232832),
+              color: isSelected
+                  ? const Color(0xFF6366F1)
+                  : (isDark ? const Color(0xFF232832) : const Color(0xFFF1F5F9)),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
+                color: isSelected
+                    ? Colors.white.withOpacity(0.2)
+                    : (isDark ? Colors.transparent : Colors.black.withOpacity(0.06)),
               ),
             ),
             child: Text(
@@ -225,7 +1438,9 @@ class _MainNavigationState extends State<MainNavigation> {
               style: GoogleFonts.jetBrainsMono(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.white.withOpacity(0.5) : const Color(0xFF475569)),
               ),
             ),
           ),
@@ -235,7 +1450,9 @@ class _MainNavigationState extends State<MainNavigation> {
             style: GoogleFonts.inter(
               fontSize: 9,
               fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.3),
+              color: isSelected
+                  ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                  : (isDark ? Colors.white.withOpacity(0.3) : const Color(0xFF94A3B8)),
               letterSpacing: 0.5,
             ),
           ),
@@ -244,14 +1461,71 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
+  Widget _buildGradientIntensityChip(
+    BuildContext context,
+    String label,
+    double value,
+    StateSetter setSheetState,
+  ) {
+    final currentTheme = ThemeController.instance.currentTheme;
+    final isSelected =
+        (ThemeController.instance.gradientIntensity - value).abs() < 0.05;
+    final isDark = currentTheme.isDark;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          ThemeController.instance.setGradientIntensity(value);
+          setSheetState(() {});
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? currentTheme.accent
+                : (isDark
+                    ? Colors.white.withOpacity(0.06)
+                    : Colors.black.withOpacity(0.05)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? currentTheme.accent
+                  : (isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : Colors.black.withOpacity(0.08)),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected
+                    ? (currentTheme.accent.computeLuminance() > 0.5
+                        ? Colors.black
+                        : Colors.white)
+                    : (isDark ? Colors.white70 : const Color(0xFF334155)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    LockScreenNotificationService.onEntriesUpdatedExternally = null;
     _entriesNotifier.dispose();
     super.dispose();
   }
 
   Future<void> _loadEntries() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     final String? entriesJson = prefs.getString('chronos_entries');
     if (entriesJson != null) {
       final List<dynamic> decoded = jsonDecode(entriesJson);
@@ -261,6 +1535,7 @@ class _MainNavigationState extends State<MainNavigation> {
             .toList();
         _entriesNotifier.value = _entries;
       });
+      _updateLockScreenNotification();
     }
   }
 
@@ -276,6 +1551,7 @@ class _MainNavigationState extends State<MainNavigation> {
       _entriesNotifier.value = _entries;
     });
     _saveEntries();
+    _updateLockScreenNotification();
   }
 
   Future<String?> _saveImage(File? image) async {
@@ -305,207 +1581,441 @@ class _MainNavigationState extends State<MainNavigation> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF161922),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(32),
-              topRight: Radius.circular(32),
+        builder: (context, setSheetState) {
+          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+          final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+          final categoryColor = _getCategoryColor(entry.category);
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.88,
             ),
-          ),
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+            decoration: BoxDecoration(
+              color: appCardBg,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
               ),
-              const SizedBox(height: 24),
-              Row(
+            ),
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.timeline_rounded,
-                    size: 20,
-                    color: _getCategoryColor(entry.category),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'COMPLETE MOMENT',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Add a final note or photo to close this chapter.',
-                style: GoogleFonts.inter(
-                  color: Colors.white.withOpacity(0.4),
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 32),
-              if (doneImage != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Image.file(
-                          doneImage!,
-                          height: 200,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+                  // iOS Style Handle Bar with swipe-down to dismiss
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragUpdate: (details) {
+                      if (details.primaryDelta! > 7) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: GestureDetector(
-                          onTap: () => setSheetState(() => doneImage = null),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: Colors.black54,
-                              shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: bottomInset),
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (scrollInfo) {
+                          if (scrollInfo is OverscrollNotification && scrollInfo.overscroll < -15) {
+                            Navigator.pop(context);
+                            return true;
+                          }
+                          return false;
+                        },
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + bottomPadding),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+
+                      // Compact Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: categoryColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 20,
+                            child: Icon(
+                              Icons.task_alt_rounded,
+                              size: 16,
+                              color: categoryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '완료 기록',
+                            style: GoogleFonts.inter(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              color: appText,
+                            ),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: appSubtleBg,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 16,
+                                color: appTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '이 챕터를 완료하며 남길 메모나 사진을 추가하세요.',
+                        style: GoogleFonts.inter(
+                          color: appTextTertiary,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Image Preview
+                      if (doneImage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.file(
+                                  doneImage!,
+                                  height: 130,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: () => setSheetState(() => doneImage = null),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                    child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // Note Input (Compact)
+                      TextField(
+                        controller: doneNoteController,
+                        autofocus: true,
+                        maxLines: 4,
+                        minLines: 2,
+                        keyboardType: TextInputType.multiline,
+                        style: GoogleFonts.inter(fontSize: 14, color: appText),
+                        decoration: InputDecoration(
+                          hintText: '어떤 성과를 이루셨나요?',
+                          hintStyle: GoogleFonts.inter(fontSize: 13.5, color: appTextTertiary),
+                          filled: true,
+                          fillColor: appSubtleBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.camera_alt_outlined, size: 19),
+                                color: categoryColor,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                padding: EdgeInsets.zero,
+                                onPressed: () async {
+                                  final String? captured = await Navigator.push<String>(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const CameraPage()),
+                                  );
+                                  if (captured != null) {
+                                    setSheetState(() => doneImage = File(captured));
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.photo_library_outlined, size: 19),
+                                color: categoryColor,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                padding: EdgeInsets.zero,
+                                onPressed: () async {
+                                  final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
+                                  if (img != null) setSheetState(() => doneImage = File(img.path));
+                                },
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Action Buttons Row (Compact Cancel + Wide Main Button)
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 76,
+                            height: 46,
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                backgroundColor: appSubtleBg,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                padding: EdgeInsets.zero,
+                              ),
+                              child: Text(
+                                '취소',
+                                style: GoogleFonts.inter(
+                                  color: appTextSecondary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: SizedBox(
+                              height: 46,
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  final String? savedPath = await _saveImage(doneImage);
+                                  final updatedEntries = List<TimestampEntry>.from(_entries);
+                                  final index = updatedEntries.indexWhere((e) => e.id == entry.id);
+                                  if (index != -1) {
+                                    updatedEntries[index] = TimestampEntry(
+                                      id: entry.id,
+                                      timestamp: entry.timestamp,
+                                      note: entry.note,
+                                      category: entry.category,
+                                      imagePath: entry.imagePath,
+                                      status: 'done',
+                                      doneTimestamp: DateTime.now(),
+                                      doneNote: doneNoteController.text.trim(),
+                                      doneImagePath: savedPath,
+                                    );
+                                    _onEntriesChanged(updatedEntries);
+                                  }
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: categoryColor,
+                                  foregroundColor: categoryColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                ),
+                                child: Text(
+                                  '완료 기록 저장',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          ],
+        ),
+      ),
+    );
+  },
+      ),
+    );
+  }
+
+  Future<void> _showRevertConfirmSheet(TimestampEntry entry) async {
+    final categoryColor = _getCategoryColor(entry.category);
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+        return Container(
+          decoration: BoxDecoration(
+            color: appCardBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottomPadding),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // iOS Handle Bar
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: categoryColor.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.replay_rounded,
+                          size: 18,
+                          color: categoryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'TODO로 되돌리기',
+                        style: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: appText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '이 작업을 다시 TODO로 되돌리시겠습니까?\n기존에 기록했던 완료 메모와 완료 시간이 초기화됩니다.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: appTextSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 76,
+                        height: 46,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            backgroundColor: appSubtleBg,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(
+                            '취소',
+                            style: GoogleFonts.inter(
+                              color: appTextSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final updatedEntries = List<TimestampEntry>.from(_entries);
+                              final index = updatedEntries.indexWhere((e) => e.id == entry.id);
+                              if (index != -1) {
+                                updatedEntries[index] = TimestampEntry(
+                                  id: entry.id,
+                                  timestamp: entry.timestamp,
+                                  note: entry.note,
+                                  category: entry.category,
+                                  imagePath: entry.imagePath,
+                                  status: 'todo',
+                                  doneTimestamp: null,
+                                  doneNote: null,
+                                  doneImagePath: null,
+                                );
+                                _onEntriesChanged(updatedEntries);
+                              }
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: categoryColor,
+                              foregroundColor: categoryColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              '되돌리기',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              TextField(
-                controller: doneNoteController,
-                autofocus: true,
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: null,
-                minLines: 1,
-                keyboardType: TextInputType.multiline,
-                textCapitalization: TextCapitalization.none,
-                decoration: InputDecoration(
-                  hintText: 'What did you accomplish?',
-                  hintStyle: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.2),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.03),
-                  contentPadding: const EdgeInsets.all(20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none,
-                  ),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.camera_alt_outlined, size: 22),
-                        color: _getCategoryColor(entry.category),
-                        onPressed: () async {
-                          final XFile? img = await _picker.pickImage(
-                            source: ImageSource.camera,
-                          );
-                          if (img != null)
-                            setSheetState(() => doneImage = File(img.path));
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.photo_library_outlined,
-                          size: 22,
-                        ),
-                        color: _getCategoryColor(entry.category),
-                        onPressed: () async {
-                          final XFile? img = await _picker.pickImage(
-                            source: ImageSource.gallery,
-                          );
-                          if (img != null)
-                            setSheetState(() => doneImage = File(img.path));
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                  ),
-                ),
+                ],
               ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 60,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final String? savedPath = await _saveImage(doneImage);
-                    final updatedEntries = List<TimestampEntry>.from(_entries);
-                    final index = updatedEntries.indexWhere(
-                      (e) => e.id == entry.id,
-                    );
-                    if (index != -1) {
-                      updatedEntries[index] = TimestampEntry(
-                        id: entry.id,
-                        timestamp: entry.timestamp,
-                        note: entry.note,
-                        category: entry.category,
-                        imagePath: entry.imagePath,
-                        status: 'done',
-                        doneTimestamp: DateTime.now(),
-                        doneNote: doneNoteController.text.trim(),
-                        doneImagePath: savedPath,
-                      );
-                      _onEntriesChanged(updatedEntries);
-                    }
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _getCategoryColor(entry.category),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  child: Text(
-                    'COMPLETE CHAPTER',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -517,6 +2027,9 @@ class _MainNavigationState extends State<MainNavigation> {
       if (entry.status == 'todo') {
         _showDoneCompletionSheet(entry);
       } else if (entry.status == 'done') {
+        _showRevertConfirmSheet(entry);
+      } else {
+        // 일반 항목(none) -> TODO로 전환
         updatedEntries[index] = TimestampEntry(
           id: entry.id,
           timestamp: entry.timestamp,
@@ -533,10 +2046,30 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
+  void _updateEntry(TimestampEntry updatedEntry) {
+    final updatedEntries = List<TimestampEntry>.from(_entries);
+    final index = updatedEntries.indexWhere((e) => e.id == updatedEntry.id);
+    if (index != -1) {
+      updatedEntries[index] = updatedEntry;
+      _onEntriesChanged(updatedEntries);
+    }
+  }
+
+  void _onCenterAddPressed() {
+    HapticFeedback.mediumImpact();
+    if (_selectedIndex != 0) {
+      setState(() => _selectedIndex = 0);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _homePageKey.currentState?.showAddEntrySheet();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Widget> screens = [
       HomePage(
+        key: _homePageKey,
         entries: _entriesNotifier.value,
         onEntriesChanged: _onEntriesChanged,
         onDelete: _deleteEntry,
@@ -545,6 +2078,7 @@ class _MainNavigationState extends State<MainNavigation> {
         saveImage: _saveImage,
         uiScale: _uiScale,
         categories: _categories,
+        defaultCategory: _defaultCategory,
         onAddCategory: _addCategory,
       ),
       CategoryView(
@@ -553,73 +2087,401 @@ class _MainNavigationState extends State<MainNavigation> {
         onToggle: _toggleEntryStatus,
         onClearCategory: _clearCategory,
         onDeleteCategory: _deleteCategory,
+        onUpdateEntry: _updateEntry,
         uiScale: _uiScale,
         categories: _categories,
         categoryColors: _categoryIndicatorColors,
+        defaultCategory: _defaultCategory,
+        onAddCategory: _addCategory,
+        onReorderCategories: _reorderCategories,
+        onSetDefaultCategory: _setDefaultCategory,
+        onUpdateCategoryColor: _updateCategoryColor,
+        onRenameCategory: _renameCategory,
       ),
       InsightView(
         entriesNotifier: _entriesNotifier,
         uiScale: _uiScale,
+        categoryColors: _categoryIndicatorColors,
       ),
     ];
 
+    final currentTheme = ThemeController.instance.currentTheme;
+    final gradientIntensity = ThemeController.instance.gradientIntensity;
+    final isDark = currentTheme.isDark;
+    final effectiveIntensity = isDark ? gradientIntensity : gradientIntensity * 0.35;
     return Scaffold(
-      body: screens[_selectedIndex],
-      bottomNavigationBar: Container(
+      extendBody: true,
+      backgroundColor: currentTheme.scaffoldBg,
+      body: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF161922),
-          border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(0.05)),
-          ),
+          color: currentTheme.scaffoldBg,
+          gradient: effectiveIntensity > 0
+              ? LinearGradient(
+                  begin: Alignment.bottomLeft,
+                  end: Alignment.topRight,
+                  colors: [
+                    currentTheme.accent.withOpacity(effectiveIntensity),
+                    currentTheme.scaffoldBg.withOpacity(0.85),
+                    currentTheme.scaffoldBg,
+                  ],
+                  stops: const [0.0, 0.45, 1.0],
+                )
+              : null,
         ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) {
-            if (index == 3) {
-              _showSettingsMenu(context);
-            } else {
-              setState(() => _selectedIndex = index);
-            }
-          },
-          backgroundColor: Colors.transparent,
-          selectedItemColor: const Color(0xFF6366F1),
-          unselectedItemColor: Colors.white.withOpacity(0.3),
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          selectedLabelStyle: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+        child: screens[_selectedIndex],
+      ),
+      bottomNavigationBar: _buildIosBottomNav(context, currentTheme),
+    );
+  }
+
+  Widget _buildIosBottomNav(BuildContext context, AppTheme currentTheme) {
+    final isDark = currentTheme.isDark;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    // 라이트 모드에서 포인트 색상이 너무 밝거나 흰색일 경우 고대비 색상으로 안전하게 렌더링
+    final effectiveAccent = (!isDark && currentTheme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : currentTheme.accent;
+
+    const double barHeight = 58.0;
+    const double centerBtnDiameter = 58.0;
+    const double protrusion = 22.0;
+    final double totalHeight = barHeight + bottomPadding + protrusion;
+
+    return SizedBox(
+      height: totalHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomCenter,
+        children: [
+          // 1. 하단 바 본체 (맑은 투명 글래스모피즘 + 윗부분 원형 경계선 및 은은한 그림자)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: barHeight + bottomPadding,
+            child: ClipPath(
+              clipper: NotchedBarClipper(),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: CustomPaint(
+                  painter: NotchedTopBorderPainter(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.32)
+                        : Colors.black.withOpacity(0.22),
+                    strokeWidth: 1.0,
+                    isDark: isDark,
+                  ),
+                  child: Container(
+                    color: Colors.transparent,
+                    padding: EdgeInsets.only(bottom: bottomPadding),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        // 좌측 1: 타임라인
+                        _buildNavItem(
+                          icon: Icons.schedule_rounded,
+                          label: '타임라인',
+                          isSelected: _selectedIndex == 0,
+                          accentColor: effectiveAccent,
+                          isDark: isDark,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _selectedIndex = 0);
+                          },
+                        ),
+                        // 좌측 2: 카테고리
+                        _buildNavItem(
+                          icon: Icons.grid_view_rounded,
+                          label: '카테고리',
+                          isSelected: _selectedIndex == 1,
+                          accentColor: effectiveAccent,
+                          isDark: isDark,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _selectedIndex = 1);
+                          },
+                        ),
+                        // 중앙 여백 (중앙 원형 버튼 자리)
+                        const SizedBox(width: 82),
+                        // 우측 1: 인사이트
+                        _buildNavItem(
+                          icon: Icons.insights_rounded,
+                          label: '인사이트',
+                          isSelected: _selectedIndex == 2,
+                          accentColor: effectiveAccent,
+                          isDark: isDark,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _selectedIndex = 2);
+                          },
+                        ),
+                        // 우측 2: 설정
+                        _buildNavItem(
+                          icon: Icons.tune_rounded,
+                          label: '설정',
+                          isSelected: false,
+                          accentColor: effectiveAccent,
+                          isDark: isDark,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            _showSettingsMenu(context);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-          unselectedLabelStyle: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+
+          // 2. 중앙 원형 + 버튼 (투명 배경 + 하단 바에 쏙 안착된 위치)
+          Positioned(
+            bottom: barHeight + bottomPadding - (centerBtnDiameter / 2) - 6.0,
+            child: GestureDetector(
+              onTap: _onCenterAddPressed,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: centerBtnDiameter,
+                height: centerBtnDiameter,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.transparent,
+                  border: Border.all(
+                    color: effectiveAccent,
+                    width: 3.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: effectiveAccent.withOpacity(0.28),
+                      blurRadius: 10,
+                      spreadRadius: 0.5,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.add_rounded,
+                    size: 32,
+                    color: effectiveAccent,
+                  ),
+                ),
+              ),
+            ),
           ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.timer_outlined),
-              activeIcon: Icon(Icons.timer),
-              label: 'Timeline',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_outlined),
-              activeIcon: Icon(Icons.grid_view_rounded),
-              label: 'Categories',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.auto_graph_outlined),
-              activeIcon: Icon(Icons.auto_graph_rounded),
-              label: 'Insights',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: 'Settings',
-            ),
-          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required Color accentColor,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: isSelected
+                    ? accentColor
+                    : (isDark
+                        ? Colors.white.withOpacity(0.38)
+                        : const Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  letterSpacing: -0.2,
+                  color: isSelected
+                      ? accentColor
+                      : (isDark
+                          ? Colors.white.withOpacity(0.4)
+                          : const Color(0xFF64748B)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+}
+
+/// 하단 내비게이션 바의 글래스모피즘 블러 및 배경을 중앙 Notch 홈에 맞춰 완벽하게 클리핑
+class NotchedBarClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final double w = size.width;
+    final double cx = w / 2;
+
+    const double cy = 6.0;
+    const double notchRadius = 35.5;
+    const double filletRadius = 14.0;
+
+    final double dy = filletRadius - cy;
+    final double hyp = notchRadius + filletRadius;
+    final double xF = math.sqrt(hyp * hyp - dy * dy);
+    final double ux = xF / hyp;
+    final double uy = dy / hyp;
+    final double xT = ux * notchRadius;
+    final double yT = cy + uy * notchRadius;
+
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(cx - xF, 0);
+
+    // 좌측 필렛 (볼록 곡선: 수평선에서 매끄럽게 Notch로 하강)
+    path.arcToPoint(
+      Offset(cx - xT, yT),
+      radius: const Radius.circular(filletRadius),
+      clockwise: true,
+    );
+
+    // 중앙 원호 (오목 곡선: + 버튼을 일정한 간격으로 완벽하게 감쌈)
+    path.arcToPoint(
+      Offset(cx + xT, yT),
+      radius: const Radius.circular(notchRadius),
+      clockwise: false,
+    );
+
+    // 우측 필렛 (볼록 곡선: Notch에서 매끄럽게 수평선으로 복귀)
+    path.arcToPoint(
+      Offset(cx + xF, 0),
+      radius: const Radius.circular(filletRadius),
+      clockwise: true,
+    );
+
+    path.lineTo(w, 0);
+    path.lineTo(w, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class NotchedTopBorderPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+  final bool isDark;
+
+  NotchedTopBorderPainter({
+    required this.color,
+    this.strokeWidth = 1.0,
+    this.isDark = true,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double cx = w / 2;
+
+    // + 버튼 중심 (cy): 6.0, 외곽 반지름 약 30.75
+    // Notch 원호 반지름: 35.5 => 4.75px 균일 간격 형성
+    // 필렛 반지름: 14.0 => 수평선과 Notch 사이를 C1 접선 연속으로 부드럽게 연결
+    const double cy = 6.0;
+    const double notchRadius = 35.5;
+    const double filletRadius = 14.0;
+
+    final double dy = filletRadius - cy;
+    final double hyp = notchRadius + filletRadius;
+    final double xF = math.sqrt(hyp * hyp - dy * dy);
+    final double ux = xF / hyp;
+    final double uy = dy / hyp;
+    final double xT = ux * notchRadius;
+    final double yT = cy + uy * notchRadius;
+
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(cx - xF, 0);
+
+    // 1. 좌측 볼록 어깨 곡선
+    path.arcToPoint(
+      Offset(cx - xT, yT),
+      radius: const Radius.circular(filletRadius),
+      clockwise: true,
+    );
+
+    // 2. 중앙 오목 원호
+    path.arcToPoint(
+      Offset(cx + xT, yT),
+      radius: const Radius.circular(notchRadius),
+      clockwise: false,
+    );
+
+    // 3. 우측 볼록 어깨 곡선
+    path.arcToPoint(
+      Offset(cx + xF, 0),
+      radius: const Radius.circular(filletRadius),
+      clockwise: true,
+    );
+
+    path.lineTo(w, 0);
+
+    // 하단 바의 반투명 배경 (맑고 투명한 글래스모피즘 배경)
+    final bgPath = Path.from(path)
+      ..lineTo(w, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+
+    final bgPaint = Paint()
+      ..color = isDark
+          ? Colors.black.withOpacity(0.38)
+          : Colors.white.withOpacity(0.48)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(bgPath, bgPaint);
+
+    // 1. 은은한 단일 섀도우 (테두리 곡선을 따라 은은하게 안착)
+    final shadowPaint = Paint()
+      ..color = isDark
+          ? Colors.black.withOpacity(0.32)
+          : Colors.black.withOpacity(0.10)
+      ..strokeWidth = strokeWidth + 1.2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+
+    canvas.save();
+    canvas.translate(0, 1.0);
+    canvas.drawPath(path, shadowPaint);
+    canvas.restore();
+
+    // 2. 경계선 본체 (깨끗하고 세련된 1.0px 실선)
+    final borderPaint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(path, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant NotchedTopBorderPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.isDark != isDark;
   }
 }
 
@@ -634,8 +2496,16 @@ class TimestampEntry {
   final String? doneNote;
   final String? doneImagePath;
   final DateTime? targetDate;
+  final int? manualDurationMinutes;
+
+  String get text => note;
+
+  int get effectiveDurationMinutes => computedDurationMinutes ?? 0;
 
   int? get computedDurationMinutes {
+    if (manualDurationMinutes != null) {
+      return manualDurationMinutes;
+    }
     if (status == 'done' && doneTimestamp != null) {
       return doneTimestamp!.difference(timestamp).inMinutes;
     }
@@ -653,7 +2523,40 @@ class TimestampEntry {
     this.doneNote,
      this.doneImagePath,
     this.targetDate,
+    this.manualDurationMinutes,
   });
+
+  TimestampEntry copyWith({
+    String? id,
+    DateTime? timestamp,
+    String? note,
+    String? category,
+    String? imagePath,
+    bool clearImage = false,
+    String? status,
+    DateTime? doneTimestamp,
+    String? doneNote,
+    String? doneImagePath,
+    DateTime? targetDate,
+    int? manualDurationMinutes,
+    bool clearManualDuration = false,
+  }) {
+    return TimestampEntry(
+      id: id ?? this.id,
+      timestamp: timestamp ?? this.timestamp,
+      note: note ?? this.note,
+      category: category ?? this.category,
+      imagePath: clearImage ? null : (imagePath ?? this.imagePath),
+      status: status ?? this.status,
+      doneTimestamp: doneTimestamp ?? this.doneTimestamp,
+      doneNote: doneNote ?? this.doneNote,
+      doneImagePath: doneImagePath ?? this.doneImagePath,
+      targetDate: targetDate ?? this.targetDate,
+      manualDurationMinutes: clearManualDuration
+          ? null
+          : (manualDurationMinutes ?? this.manualDurationMinutes),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -666,6 +2569,7 @@ class TimestampEntry {
     'doneNote': doneNote,
      'doneImagePath': doneImagePath,
      'targetDate': targetDate?.millisecondsSinceEpoch,
+    'manualDurationMinutes': manualDurationMinutes,
   };
 
   factory TimestampEntry.fromJson(Map<String, dynamic> json) => TimestampEntry(
@@ -683,6 +2587,7 @@ class TimestampEntry {
        targetDate: json['targetDate'] != null
         ? DateTime.fromMillisecondsSinceEpoch(json['targetDate'])
         : null,
+    manualDurationMinutes: json['manualDurationMinutes'],
   );
 }
 
@@ -820,61 +2725,118 @@ class _QuickAddHeaderDelegate extends SliverPersistentHeaderDelegate {
   final VoidCallback onTap;
   final Color categoryColor;
   final double uiScale;
+  final AppTheme theme;
 
   _QuickAddHeaderDelegate({
     required this.onTap,
     required this.categoryColor,
     required this.uiScale,
+    required this.theme,
   });
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final isDark = theme.isDark;
+
     return Container(
-      color: const Color(0xFF0D0F14),
+      color: Colors.transparent,
       alignment: Alignment.center,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: BoxDecoration(
-              color: const Color(0xFF161922),
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [const Color(0xFF1E2330), const Color(0xFF161922)]
+                    : [const Color(0xFFFFFFFF), const Color(0xFFF8FAFC)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: categoryColor.withOpacity(0.3),
-                width: 1.2,
+                color: theme.accent.withOpacity(isDark ? 0.45 : 0.35),
+                width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+                  color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
                 ),
-                BoxShadow(
-                  color: categoryColor.withOpacity(0.05),
-                  blurRadius: 15,
-                  spreadRadius: -2,
-                ),
+                if (isDark)
+                  BoxShadow(
+                    color: theme.accent.withOpacity(0.15),
+                    blurRadius: 14,
+                    spreadRadius: -1,
+                  ),
               ],
             ),
             child: Row(
               children: [
-                _BlinkingDot(color: categoryColor),
-                const SizedBox(width: 16),
-                Text(
-                  'What\'s on your mind?',
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.4),
-                    fontSize: 14 * uiScale,
-                    fontWeight: FontWeight.w600,
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: theme.accent.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: _BlinkingDot(color: theme.accent),
                   ),
                 ),
-                const Spacer(),
-                Icon(
-                  Icons.add_circle_outline_rounded,
-                  color: categoryColor.withOpacity(0.5),
-                  size: 24,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '이 순간을 기록해볼까요',
+                        style: GoogleFonts.inter(
+                          color: isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF0F172A),
+                          fontSize: 13.5 * uiScale,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '당신을 채우는 작은 조각들을 더해보세요',
+                        style: GoogleFonts.inter(
+                          color: isDark ? Colors.white.withOpacity(0.45) : const Color(0xFF64748B),
+                          fontSize: 10.5 * uiScale,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: theme.accent,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.accent.withOpacity(0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: theme.accent.computeLuminance() > 0.6 ? Colors.black : Colors.white,
+                    size: 20,
+                  ),
                 ),
               ],
             ),
@@ -885,15 +2847,789 @@ class _QuickAddHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => 82;
+  double get maxExtent => 88 * uiScale;
 
   @override
-  double get minExtent => 82;
+  double get minExtent => 88 * uiScale;
 
   @override
   bool shouldRebuild(covariant _QuickAddHeaderDelegate oldDelegate) {
-    return oldDelegate.categoryColor != categoryColor || oldDelegate.uiScale != uiScale;
+    return oldDelegate.categoryColor != categoryColor ||
+        oldDelegate.uiScale != uiScale ||
+        oldDelegate.theme.id != theme.id ||
+        oldDelegate.theme.isDark != theme.isDark;
   }
+}
+
+Future<Color?> showCustomColorPickerDialog(
+  BuildContext context, {
+  Color? initialColor,
+}) {
+  Color currentColor = initialColor ?? const Color(0xFF6366F1);
+  HSVColor hsvColor = HSVColor.fromColor(currentColor);
+
+  final List<Color> quickPalette = [
+    const Color(0xFF6366F1), // Indigo
+    const Color(0xFF3B82F6), // Blue
+    const Color(0xFF06B6D4), // Cyan
+    const Color(0xFF14B8A6), // Teal
+    const Color(0xFF10B981), // Emerald
+    const Color(0xFF22C55E), // Green
+    const Color(0xFF84CC16), // Lime
+    const Color(0xFFEAB308), // Yellow
+    const Color(0xFFF59E0B), // Amber
+    const Color(0xFFF97316), // Orange
+    const Color(0xFFEF4444), // Red
+    const Color(0xFFF43F5E), // Rose
+    const Color(0xFFEC4899), // Pink
+    const Color(0xFFD946EF), // Fuchsia
+    const Color(0xFF8B5CF6), // Purple
+    const Color(0xFFA855F7), // Violet
+    const Color(0xFF64748B), // Slate
+  ];
+
+  return showModalBottomSheet<Color>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    enableDrag: true,
+    isDismissible: true,
+    builder: (dialogCtx) => StatefulBuilder(
+      builder: (context, setPickerState) {
+        final Color displayColor = hsvColor.toColor();
+        final String hexString =
+            '#${displayColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+        final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom;
+
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
+          decoration: BoxDecoration(
+            color: appCardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: appBorder),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 드래그 핸들 (아래로 쓸어내리면 팝업 닫힘)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragUpdate: (details) {
+                  if (details.primaryDelta! > 6) {
+                    Navigator.pop(dialogCtx);
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isAppDark
+                            ? Colors.white.withOpacity(0.15)
+                            : Colors.black.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Compact Header (Identical to + button Add Sheet)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: displayColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.palette_rounded,
+                        size: 16,
+                        color: displayColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '커스텀 색상 선택',
+                      style: GoogleFonts.inter(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: appText,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(dialogCtx),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: appSubtleBg,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: appTextSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              Flexible(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification is OverscrollNotification &&
+                        notification.overscroll < -15) {
+                      Navigator.pop(dialogCtx);
+                      return true;
+                    }
+                    return false;
+                  },
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 14 + MediaQuery.of(context).padding.bottom),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Color preview bar
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: appSubtleBg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: appBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: displayColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: displayColor.withOpacity(0.4),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    hexString,
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: appText,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'RGB(${displayColor.red}, ${displayColor.green}, ${displayColor.blue})',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: appTextTertiary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '색상 팔레트',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: appTextTertiary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: quickPalette.map((pColor) {
+                            final bool isSel = displayColor.value == pColor.value;
+                            return GestureDetector(
+                              onTap: () {
+                                setPickerState(() {
+                                  hsvColor = HSVColor.fromColor(pColor);
+                                });
+                              },
+                              child: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: pColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSel ? (isAppDark ? Colors.white : Colors.black) : (isAppDark ? Colors.white12 : Colors.black12),
+                                    width: isSel ? 2.5 : 1,
+                                  ),
+                                ),
+                                child: isSel
+                                    ? Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: pColor.computeLuminance() > 0.5
+                                            ? Colors.black
+                                            : Colors.white,
+                                      )
+                                    : null,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 12),
+                        // Hue Slider
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '색상 (Hue)',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: appTextSecondary,
+                              ),
+                            ),
+                            Text(
+                              '${hsvColor.hue.round()}°',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11,
+                                color: appTextTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SliderTheme(
+                          data: SliderThemeData(
+                            trackHeight: 12,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                            thumbColor: isAppDark ? Colors.white : const Color(0xFF0F172A),
+                            activeTrackColor: Colors.transparent,
+                            inactiveTrackColor: Colors.transparent,
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                height: 12,
+                                margin: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFFFF0000),
+                                      Color(0xFFFFFF00),
+                                      Color(0xFF00FF00),
+                                      Color(0xFF00FFFF),
+                                      Color(0xFF0000FF),
+                                      Color(0xFFFF00FF),
+                                      Color(0xFFFF0000),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Slider(
+                                value: hsvColor.hue,
+                                min: 0,
+                                max: 360,
+                                onChanged: (val) {
+                                  setPickerState(() {
+                                    hsvColor = hsvColor.withHue(val);
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Saturation Slider
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '채도 (Saturation)',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: appTextSecondary,
+                              ),
+                            ),
+                            Text(
+                              '${(hsvColor.saturation * 100).round()}%',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11,
+                                color: appTextTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SliderTheme(
+                          data: SliderThemeData(
+                            trackHeight: 12,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                            thumbColor: isAppDark ? Colors.white : const Color(0xFF0F172A),
+                            activeTrackColor: Colors.transparent,
+                            inactiveTrackColor: Colors.transparent,
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                height: 12,
+                                margin: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      HSVColor.fromAHSV(1.0, hsvColor.hue, 0.0, hsvColor.value).toColor(),
+                                      HSVColor.fromAHSV(1.0, hsvColor.hue, 1.0, hsvColor.value).toColor(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Slider(
+                                value: hsvColor.saturation,
+                                min: 0,
+                                max: 1.0,
+                                onChanged: (val) {
+                                  setPickerState(() {
+                                    hsvColor = hsvColor.withSaturation(val);
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Brightness Slider
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '밝기 (Brightness)',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: appTextSecondary,
+                              ),
+                            ),
+                            Text(
+                              '${(hsvColor.value * 100).round()}%',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11,
+                                color: appTextTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SliderTheme(
+                          data: SliderThemeData(
+                            trackHeight: 12,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                            thumbColor: isAppDark ? Colors.white : const Color(0xFF0F172A),
+                            activeTrackColor: Colors.transparent,
+                            inactiveTrackColor: Colors.transparent,
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                height: 12,
+                                margin: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.black,
+                                      HSVColor.fromAHSV(1.0, hsvColor.hue, hsvColor.saturation, 1.0).toColor(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Slider(
+                                value: hsvColor.value,
+                                min: 0.1,
+                                max: 1.0,
+                                onChanged: (val) {
+                                  setPickerState(() {
+                                    hsvColor = hsvColor.withValue(val);
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        // Action Buttons Row (Compact Cancel + Wide Main Button)
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 76,
+                              height: 46,
+                              child: TextButton(
+                                onPressed: () => Navigator.pop(dialogCtx),
+                                style: TextButton.styleFrom(
+                                  backgroundColor: appSubtleBg,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                ),
+                                child: Text(
+                                  '취소',
+                                  style: GoogleFonts.inter(
+                                    color: appTextSecondary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: SizedBox(
+                                height: 46,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(dialogCtx, displayColor);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: displayColor,
+                                    foregroundColor: displayColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '색상 적용',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+void showAddCategoryModal(
+  BuildContext context, {
+  required Function(String, Color) onAddCategory,
+  Function(String)? onCategoryCreated,
+}) {
+  final TextEditingController controller = TextEditingController();
+  Color selectedColor = const Color(0xFF6366F1);
+  final List<Color> presetColors = [
+    const Color(0xFF6366F1),
+    const Color(0xFF10B981),
+    const Color(0xFFEF4444),
+    const Color(0xFFF59E0B),
+    const Color(0xFF8B5CF6),
+    const Color(0xFFEC4899),
+    const Color(0xFF06B6D4),
+    const Color(0xFF3B82F6),
+    const Color(0xFF14B8A6),
+    const Color(0xFFF97316),
+  ];
+
+  showModalBottomSheet(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setSheetState) {
+        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+        final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+
+        final double effectiveBottom =
+            bottomInset > 0 ? bottomInset + 12 : bottomPadding + 16;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: appCardBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            effectiveBottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Compact Header (Identical to + button Add Sheet)
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: selectedColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.grid_view_rounded,
+                      size: 16,
+                      color: selectedColor,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '새 카테고리',
+                    style: GoogleFonts.inter(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: appText,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: appSubtleBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: appTextSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                style: GoogleFonts.inter(color: appText, fontSize: 14.5),
+                decoration: InputDecoration(
+                  hintText: '카테고리 이름을 입력하세요',
+                  hintStyle: GoogleFonts.inter(
+                    color: appTextTertiary,
+                    fontSize: 14,
+                  ),
+                  filled: true,
+                  fillColor: appSubtleBg,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '색상 선택',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: appTextTertiary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    ...presetColors.map((color) {
+                      bool isSelected = selectedColor.value == color.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: GestureDetector(
+                          onTap: () => setSheetState(() => selectedColor = color),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? (isAppDark ? Colors.white : Colors.black87) : Colors.transparent,
+                                width: 2.2,
+                              ),
+                              boxShadow: [
+                                if (isSelected)
+                                  BoxShadow(
+                                    color: color.withOpacity(isAppDark ? 0.45 : 0.22),
+                                    blurRadius: isAppDark ? 8 : 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                              ],
+                            ),
+                            child: isSelected
+                                ? Icon(
+                                    Icons.check,
+                                    size: 18,
+                                    color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      );
+                    }),
+                    GestureDetector(
+                      onTap: () async {
+                        final custom = await showCustomColorPickerDialog(
+                          context,
+                          initialColor: selectedColor,
+                        );
+                        if (custom != null) {
+                          setSheetState(() {
+                            if (!presetColors.any((c) => c.value == custom.value)) {
+                              presetColors.add(custom);
+                            }
+                            selectedColor = custom;
+                          });
+                        }
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: appSubtleBg,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: appBorder,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.add_rounded,
+                          color: appText,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Action Buttons Row (Compact Cancel + Wide Main Button)
+              Row(
+                children: [
+                  SizedBox(
+                    width: 76,
+                    height: 46,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        backgroundColor: appSubtleBg,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: Text(
+                        '취소',
+                        style: GoogleFonts.inter(
+                          color: appTextSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      height: 46,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final name = controller.text.trim();
+                          if (name.isNotEmpty) {
+                            onAddCategory(name, selectedColor);
+                            Navigator.pop(context);
+                            if (onCategoryCreated != null) {
+                              onCategoryCreated(name);
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedColor,
+                          foregroundColor: selectedColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          '카테고리 생성',
+                          style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class HomePage extends StatefulWidget {
@@ -905,6 +3641,7 @@ class HomePage extends StatefulWidget {
   final Future<String?> Function(File?) saveImage;
   final double uiScale;
   final List<String> categories;
+  final String defaultCategory;
   final Function(String, Color) onAddCategory;
 
   const HomePage({
@@ -917,6 +3654,7 @@ class HomePage extends StatefulWidget {
     required this.saveImage,
     required this.uiScale,
     required this.categories,
+    required this.defaultCategory,
     required this.onAddCategory,
   });
 
@@ -934,6 +3672,7 @@ class _HomePageState extends State<HomePage> {
   bool _isTodo = false;
   DateTime? _targetDate;
   bool _showOnlyTodo = false;
+  bool _showSwipeGuide = false;
 
   String _selectedCategory = 'General';
 
@@ -944,11 +3683,33 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _selectedCategory = widget.defaultCategory;
     _updateTime();
+    _loadSwipeGuideState();
     _timer = Timer.periodic(
       const Duration(seconds: 1),
       (timer) => _updateTime(),
     );
+  }
+
+  Future<void> _loadSwipeGuideState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool hasSeen = prefs.getBool('has_seen_swipe_guide') ?? false;
+    if (!hasSeen && mounted) {
+      setState(() {
+        _showSwipeGuide = true;
+      });
+    }
+  }
+
+  Future<void> _dismissSwipeGuide() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_seen_swipe_guide', true);
+    if (mounted) {
+      setState(() {
+        _showSwipeGuide = false;
+      });
+    }
   }
 
   @override
@@ -968,150 +3729,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _showAddCategoryDialog() {
-    final TextEditingController controller = TextEditingController();
-    Color selectedColor = const Color(0xFF6366F1);
-    final List<Color> presetColors = [
-      const Color(0xFF6366F1),
-      const Color(0xFF10B981),
-      const Color(0xFFEF4444),
-      const Color(0xFFF59E0B),
-      const Color(0xFF8B5CF6),
-      const Color(0xFFEC4899),
-      const Color(0xFF06B6D4),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF161922),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(32),
-              topRight: Radius.circular(32),
-            ),
-          ),
-          padding: EdgeInsets.fromLTRB(
-            24,
-            16,
-            24,
-            MediaQuery.of(context).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'NEW CATEGORY',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                style: GoogleFonts.inter(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Category Name',
-                  hintStyle: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.2),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'COLOUR',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white.withOpacity(0.4),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: presetColors.map((color) {
-                  bool isSelected = selectedColor == color;
-                  return GestureDetector(
-                    onTap: () => setSheetState(() => selectedColor = color),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected ? Colors.white : Colors.transparent,
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          if (isSelected)
-                            BoxShadow(
-                              color: color.withOpacity(0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final name = controller.text.trim();
-                    if (name.isNotEmpty) {
-                      widget.onAddCategory(name, selectedColor);
-                      Navigator.pop(context);
-                      setState(() => _selectedCategory = name);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: selectedColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    'CREATE CATEGORY',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  void _showAddCategoryDialog({Function(String)? onCategoryCreated}) {
+    showAddCategoryModal(
+      context,
+      onAddCategory: widget.onAddCategory,
+      onCategoryCreated: (name) {
+        setState(() => _selectedCategory = name);
+        if (onCategoryCreated != null) {
+          onCategoryCreated(name);
+        }
+      },
     );
   }
 
@@ -1146,324 +3773,511 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void showAddEntrySheet() => _showAddEntrySheet();
+
   void _showAddEntrySheet() {
+    if (widget.categories.contains(widget.defaultCategory)) {
+      _selectedCategory = widget.defaultCategory;
+    } else if (widget.categories.isNotEmpty) {
+      _selectedCategory = widget.categories.first;
+    }
+    final List<String> sheetCategories = List<String>.from(widget.categories);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF161922),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(32),
-              topRight: Radius.circular(32),
+        builder: (context, setSheetState) {
+          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+          final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+          final double effectiveBottom =
+              bottomInset > 0 ? bottomInset + 10 : bottomPadding + 14;
+          final accentColor = ThemeController.instance.currentTheme.accent;
+
+          for (final c in widget.categories) {
+            if (!sheetCategories.contains(c)) {
+              sheetCategories.add(c);
+            }
+          }
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.88,
             ),
-          ),
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+            decoration: BoxDecoration(
+              color: appCardBg,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: widget.getCategoryColor(_selectedCategory).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 20,
-                      color: widget.getCategoryColor(_selectedCategory),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'RECORD MOMENT',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
-              // Category Selection
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+            ),
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(20, 12, 20, effectiveBottom),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ...widget.categories.map((cat) {
-                      bool isSelected = _selectedCategory == cat;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: InkWell(
-                          onTap: () {
-                            setState(() => _selectedCategory = cat);
-                            setSheetState(() {});
-                          },
-                          borderRadius: BorderRadius.circular(16),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? widget.getCategoryColor(cat)
-                                  : const Color(0xFF232832),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isSelected
-                                    ? Colors.white.withOpacity(0.2)
-                                    : Colors.transparent,
-                              ),
-                            ),
-                            child: Text(
-                              cat,
-                              style: GoogleFonts.inter(
-                                fontSize: 13 * widget.uiScale,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    IconButton(
-                      onPressed: _showAddCategoryDialog,
-                      icon: const Icon(Icons.add_circle_outline, size: 24),
-                      color: Colors.white.withOpacity(0.3),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // TODO Switch
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.task_alt_rounded,
-                      size: 20,
-                      color: _isTodo ? widget.getCategoryColor(_selectedCategory) : Colors.white.withOpacity(0.2),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Mark as TODO',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withOpacity(_isTodo ? 0.9 : 0.4),
-                      ),
-                    ),
-                    const Spacer(),
-                    Switch(
-                      value: _isTodo,
-                      onChanged: (val) {
-                        setState(() => _isTodo = val);
-                        setSheetState(() {});
+                    // iOS Style Handle Bar
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onVerticalDragUpdate: (details) {
+                        if (details.primaryDelta! > 7) {
+                          Navigator.pop(context);
+                        }
                       },
-                      activeColor: widget.getCategoryColor(_selectedCategory),
-                    ),
-                  ],
-                ),
-              ),
-
-              if (_isTodo) ...[
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _targetDate ?? DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                      builder: (context, child) => Theme(
-                        data: ThemeData.dark().copyWith(
-                          colorScheme: ColorScheme.dark(
-                            primary: widget.getCategoryColor(_selectedCategory),
-                            surface: const Color(0xFF161922),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
                         ),
-                        child: child!,
                       ),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        _targetDate = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
-                      });
-                      setSheetState(() {});
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.03),
-                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Row(
+                    const SizedBox(height: 12),
+
+                    // Compact Header
+                    Row(
                       children: [
-                        Icon(Icons.calendar_today_rounded, size: 18, color: Colors.white.withOpacity(0.3)),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Deadline',
-                          style: GoogleFonts.inter(fontSize: 14, color: Colors.white.withOpacity(0.6)),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: accentColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.edit_note_rounded,
+                            size: 16,
+                            color: accentColor,
+                          ),
                         ),
-                        const Spacer(),
-                        Text(
-                          _targetDate == null ? 'SELECT DATE' : DateFormat('yyyy-MM-dd').format(_targetDate!),
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: _targetDate != null ? widget.getCategoryColor(_selectedCategory) : Colors.white.withOpacity(0.3),
+                          const SizedBox(width: 8),
+                          Text(
+                            '새로운 기록',
+                            style: GoogleFonts.inter(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              color: appText,
+                            ),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: appSubtleBg,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 16,
+                                color: appTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Category Chips (Compact iOS style)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          children: [
+                            ...sheetCategories.map((cat) {
+                              final bool isSelected = _selectedCategory == cat;
+                              final bool isDefault = cat == widget.defaultCategory;
+                              final catColor = widget.getCategoryColor(cat);
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6.0),
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() => _selectedCategory = cat);
+                                    setSheetState(() {});
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 11,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? catColor.withOpacity(isAppDark ? 0.22 : 0.15)
+                                          : (isAppDark ? const Color(0xFF20242F) : const Color(0xFFF1F5F9)),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? catColor
+                                            : appBorder,
+                                        width: 1.2,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (isDefault) ...[
+                                          const Icon(
+                                            Icons.star_rounded,
+                                            size: 13,
+                                            color: Color(0xFFF59E0B),
+                                          ),
+                                          const SizedBox(width: 4),
+                                        ] else ...[
+                                          Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              color: catColor,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                        ],
+                                        Text(
+                                          cat,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.5 * widget.uiScale,
+                                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                            color: isSelected ? (isAppDark ? Colors.white : catColor) : appTextSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            GestureDetector(
+                              onTap: () {
+                                _showAddCategoryDialog(
+                                  onCategoryCreated: (newCat) {
+                                    if (!sheetCategories.contains(newCat)) {
+                                      sheetCategories.add(newCat);
+                                    }
+                                    _selectedCategory = newCat;
+                                    setSheetState(() {});
+                                  },
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: appSubtleBg,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.add_rounded,
+                                  size: 18,
+                                  color: appTextTertiary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // TODO Switch (Compact)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: appSubtleBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: appBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.task_alt_rounded,
+                              size: 16,
+                              color: _isTodo ? accentColor : appTextTertiary,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'TODO로 등록',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _isTodo ? appText : appTextTertiary,
+                              ),
+                            ),
+                            const Spacer(),
+                            Transform.scale(
+                              scale: 0.75,
+                              child: Switch(
+                                value: _isTodo,
+                                onChanged: (val) {
+                                  setState(() => _isTodo = val);
+                                  setSheetState(() {});
+                                },
+                                activeColor: accentColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      if (_isTodo) ...[
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _targetDate ?? DateTime.now(),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                              builder: (context, child) => Theme(
+                                data: (isAppDark ? ThemeData.dark() : ThemeData.light()).copyWith(
+                                  colorScheme: ColorScheme.fromSeed(
+                                    seedColor: accentColor,
+                                    brightness: isAppDark ? Brightness.dark : Brightness.light,
+                                    primary: accentColor,
+                                    surface: appCardBg,
+                                  ),
+                                ),
+                                child: child!,
+                              ),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                _targetDate = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+                              });
+                              setSheetState(() {});
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: appSubtleBg,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: appBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.calendar_today_rounded, size: 14, color: appTextTertiary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '마감 기한',
+                                  style: GoogleFonts.inter(fontSize: 12.5, color: appTextSecondary),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  _targetDate == null ? '날짜 선택' : DateFormat('yyyy.MM.dd').format(_targetDate!),
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: _targetDate != null ? accentColor : appTextTertiary,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                ),
-              ],
-              
-              const SizedBox(height: 24),
 
-              // Image Preview
-              if (_selectedImage != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 20.0),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Image.file(
-                          _selectedImage!,
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedImage = null);
-                            setSheetState(() {});
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                            child: const Icon(Icons.close, size: 20, color: Colors.white),
+                      const SizedBox(height: 12),
+
+                      // Image Preview
+                      if (_selectedImage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.file(
+                                  _selectedImage!,
+                                  height: 130,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() => _selectedImage = null);
+                                    setSheetState(() {});
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                    child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+
+                      // Note Input (Center Aligned)
+                      TextField(
+                        controller: _noteController,
+                        maxLines: 4,
+                        minLines: 2,
+                        autofocus: true,
+                        textAlign: TextAlign.center,
+                        textAlignVertical: TextAlignVertical.center,
+                        onChanged: (_) => setSheetState(() {}),
+                        style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w500,
+                          color: appText,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '지금 무슨 일이 일어나고 있나요?',
+                          hintStyle: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w400,
+                            color: appTextTertiary,
+                          ),
+                          filled: true,
+                          fillColor: isAppDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF1F5F9),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: appBorder, width: 1),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: appBorder, width: 1),
+                          ),
+                          // 좌우 대칭을 맞춰 텍스트가 정확히 시각적 정중앙에 위치하도록 prefix/suffix 크기 일치
+                          prefixIcon: const SizedBox(width: 72),
+                          prefixIconConstraints: const BoxConstraints(minWidth: 72, maxWidth: 72, minHeight: 32),
+                          suffixIconConstraints: const BoxConstraints(minWidth: 72, maxWidth: 72, minHeight: 32),
+                          suffixIcon: Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.camera_alt_outlined, size: 19),
+                                  color: appTextTertiary,
+                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => _pickImage(ImageSource.camera, setSheetState: setSheetState),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.photo_library_outlined, size: 19),
+                                  color: appTextTertiary,
+                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => _pickImage(ImageSource.gallery, setSheetState: setSheetState),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Action Buttons Row (Compact Cancel + Wide Main Button)
+                      Builder(
+                        builder: (context) {
+                          final bool canSubmit = _noteController.text.trim().isNotEmpty || _selectedImage != null;
+                          return Row(
+                            children: [
+                              SizedBox(
+                                width: 76,
+                                height: 46,
+                                child: TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: appSubtleBg,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                  child: Text(
+                                    '취소',
+                                    style: GoogleFonts.inter(
+                                      color: appTextSecondary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 46,
+                                  child: ElevatedButton(
+                                    onPressed: canSubmit
+                                        ? () {
+                                            _addTimestamp();
+                                            Navigator.pop(context);
+                                          }
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: canSubmit
+                                          ? accentColor
+                                          : (isAppDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06)),
+                                      foregroundColor: canSubmit
+                                          ? (accentColor.computeLuminance() > 0.6 ? Colors.black : Colors.white)
+                                          : (isAppDark ? Colors.white30 : Colors.black26),
+                                      disabledBackgroundColor: isAppDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06),
+                                      disabledForegroundColor: isAppDark ? Colors.white30 : Colors.black26,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    ),
+                                    child: Text(
+                                      '기록 완료',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
                 ),
-
-              // Note Input
-              TextField(
-                controller: _noteController,
-                maxLines: null,
-                minLines: 3,
-                autofocus: true,
-                style: GoogleFonts.inter(fontSize: 16),
-                decoration: InputDecoration(
-                  hintText: 'What\'s happening?',
-                  hintStyle: GoogleFonts.inter(color: Colors.white.withOpacity(0.2)),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.03),
-                  contentPadding: const EdgeInsets.all(20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  suffixIcon: Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.camera_alt_outlined),
-                          color: Colors.white.withOpacity(0.4),
-                          onPressed: () => _pickImage(ImageSource.camera, setSheetState: setSheetState),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.photo_library_outlined),
-                          color: Colors.white.withOpacity(0.4),
-                          onPressed: () => _pickImage(ImageSource.gallery, setSheetState: setSheetState),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ),
-              const SizedBox(height: 32),
-              
-              // Confirm Button
-              SizedBox(
-                width: double.infinity,
-                height: 60,
-                child: ElevatedButton(
-                  onPressed: () {
-                    _addTimestamp();
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.getCategoryColor(_selectedCategory),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  ),
-                  child: Text(
-                    'RECORD MOMENT',
-                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
-      ),
-    );
-  }
+      );
+    }
 
   Future<void> _addTimestamp() async {
+    final noteText = _noteController.text.trim();
+    if (noteText.isEmpty && _selectedImage == null) {
+      return;
+    }
     final imagePath = await _saveImage(_selectedImage);
     final newEntry = TimestampEntry(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       timestamp: DateTime.now(),
-      note: _noteController.text.trim(),
+      note: noteText,
       category: _selectedCategory,
       imagePath: imagePath,
       status: _isTodo ? 'todo' : 'none',
@@ -1483,11 +4297,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _deleteEntry(String id) {
+    if (_showSwipeGuide) {
+      _dismissSwipeGuide();
+    }
     widget.onDelete(id);
   }
 
   void _toggleEntryStatus(String id) {
     widget.onToggle(id);
+  }
+
+  void _updateEntry(TimestampEntry updatedEntry) {
+    final updatedEntries = List<TimestampEntry>.from(widget.entries);
+    final idx = updatedEntries.indexWhere((e) => e.id == updatedEntry.id);
+    if (idx != -1) {
+      updatedEntries[idx] = updatedEntry;
+      widget.onEntriesChanged(updatedEntries);
+    }
   }
 
   Widget _buildUrgentCountdown() {
@@ -1569,7 +4395,7 @@ class _HomePageState extends State<HomePage> {
             width: 4,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3),
+              color: isAppDark ? Colors.white.withOpacity(0.3) : const Color(0xFF94A3B8),
               shape: BoxShape.circle,
             ),
           ),
@@ -1578,7 +4404,7 @@ class _HomePageState extends State<HomePage> {
             quotes[quoteIndex].toUpperCase(),
             style: GoogleFonts.inter(
               fontSize: 9 * widget.uiScale,
-              color: Colors.white.withOpacity(0.3),
+              color: isAppDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
               letterSpacing: 0.5,
               fontWeight: FontWeight.w700,
             ),
@@ -1599,18 +4425,18 @@ class _HomePageState extends State<HomePage> {
     final s = absDuration.inSeconds % 60;
 
     final timeStr = hasDeadline
-        ? '${h.toString().padLeft(2, '0')}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s'
-        : 'NO DEADLINE';
+        ? '${h > 0 ? '$h시간 ' : ''}${m}분 ${s}초'
+        : '기한 없음';
 
     final statusText = !hasDeadline
-        ? 'TASK'
+        ? 'TODO'
         : isOverdue
-        ? 'EXPIRED'
-        : 'URGENT';
+        ? '마감 지남'
+        : '마감 임박';
 
     final noteText = selectedTodo.note.isNotEmpty
         ? selectedTodo.note
-        : 'Untitled Task';
+        : '이름 없는 TODO';
 
     final mainColor = !hasDeadline
         ? widget.getCategoryColor(selectedTodo.category).withOpacity(0.5)
@@ -1653,11 +4479,11 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 4),
         Text(
           hasDeadline
-              ? (isOverdue ? '$timeStr ago' : '$timeStr left')
-              : 'NO DEADLINE',
+              ? (isOverdue ? '$timeStr 지남' : '$timeStr 남음')
+              : '기한 없음',
           style: GoogleFonts.inter(
             fontSize: 10 * widget.uiScale,
-            color: Colors.white.withOpacity(0.4),
+            color: isAppDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
@@ -1669,6 +4495,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
@@ -1697,14 +4524,18 @@ class _HomePageState extends State<HomePage> {
                             style: GoogleFonts.jetBrainsMono(
                               fontSize: 48 * widget.uiScale,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: ThemeController.instance.currentTheme.isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A),
                               letterSpacing: -2,
                             ),
                           ),
                           Text(
                             _currentDate.toUpperCase(),
                             style: GoogleFonts.inter(
-                              color: Colors.white.withOpacity(0.3),
+                              color: ThemeController.instance.currentTheme.isDark
+                                  ? Colors.white.withOpacity(0.35)
+                                  : const Color(0xFF64748B),
                               fontWeight: FontWeight.w800,
                               fontSize: 10 * widget.uiScale,
                               letterSpacing: 2,
@@ -1726,6 +4557,7 @@ class _HomePageState extends State<HomePage> {
                 onTap: _showAddEntrySheet,
                 categoryColor: widget.getCategoryColor(_selectedCategory),
                 uiScale: widget.uiScale,
+                theme: ThemeController.instance.currentTheme,
               ),
             ),
 
@@ -1740,16 +4572,16 @@ class _HomePageState extends State<HomePage> {
                         Icon(
                           Icons.history_rounded,
                           size: 18,
-                          color: Colors.white.withOpacity(0.5),
+                          color: appTextSecondary,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Text(
-                          'RECENT HISTORY',
+                          '기록',
                           style: GoogleFonts.inter(
-                            fontSize: 10 * widget.uiScale,
+                            fontSize: 12 * widget.uiScale,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white.withOpacity(0.5),
-                            letterSpacing: 1.2,
+                            color: appText,
+                            letterSpacing: 0.2,
                           ),
                         ),
                       ],
@@ -1766,13 +4598,13 @@ class _HomePageState extends State<HomePage> {
                         ),
                         decoration: BoxDecoration(
                           color: _showOnlyTodo
-                              ? widget.getCategoryColor(_selectedCategory).withOpacity(0.1)
-                              : Colors.white.withOpacity(0.05),
+                              ? widget.getCategoryColor(_selectedCategory).withOpacity(0.12)
+                              : appSubtleBg,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: _showOnlyTodo
-                                ? widget.getCategoryColor(_selectedCategory).withOpacity(0.3)
-                                : Colors.white.withOpacity(0.1),
+                                ? widget.getCategoryColor(_selectedCategory).withOpacity(0.35)
+                                : appBorder,
                           ),
                         ),
                         child: Row(
@@ -1785,20 +4617,20 @@ class _HomePageState extends State<HomePage> {
                               size: 14,
                               color: _showOnlyTodo
                                   ? widget.getCategoryColor(_selectedCategory)
-                                  : Colors.white.withOpacity(0.4),
+                                  : appTextTertiary,
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'TODO ONLY',
+                              'TODO 모아보기',
                               style: GoogleFonts.inter(
-                                fontSize: 9 * widget.uiScale,
+                                fontSize: 9.5 * widget.uiScale,
                                 fontWeight: _showOnlyTodo
                                     ? FontWeight.bold
-                                    : FontWeight.w500,
+                                    : FontWeight.w600,
                                 color: _showOnlyTodo
                                     ? widget.getCategoryColor(_selectedCategory)
-                                    : Colors.white.withOpacity(0.4),
-                                letterSpacing: 0.5,
+                                    : appTextSecondary,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ],
@@ -1809,6 +4641,69 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+            if (_showSwipeGuide && widget.entries.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: appCardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: appBorder,
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isAppDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: widget.getCategoryColor(_selectedCategory).withOpacity(0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.swipe_left_rounded,
+                            size: 16,
+                            color: widget.getCategoryColor(_selectedCategory),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '카드를 왼쪽으로 스와이프하면 삭제할 수 있어요',
+                            style: GoogleFonts.inter(
+                              color: appText,
+                              fontSize: 12 * widget.uiScale,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _dismissSwipeGuide,
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 16,
+                              color: appTextTertiary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             if (widget.entries.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
@@ -1819,14 +4714,14 @@ class _HomePageState extends State<HomePage> {
                       Icon(
                         Icons.hourglass_empty_rounded,
                         size: 48,
-                        color: Colors.white.withOpacity(0.1),
+                        color: appTextTertiary.withOpacity(0.3),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No records yet',
+                        '기록된 순간이 없습니다',
                         style: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.3),
-                          fontSize: 16,
+                          color: appTextTertiary,
+                          fontSize: 15,
                         ),
                       ),
                     ],
@@ -1844,14 +4739,14 @@ class _HomePageState extends State<HomePage> {
                       Icon(
                         Icons.filter_list_off_rounded,
                         size: 48,
-                        color: Colors.white.withOpacity(0.1),
+                        color: appTextTertiary.withOpacity(0.3),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No TODOs found',
+                        '대기 중인 TODO가 없습니다',
                         style: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.3),
-                          fontSize: 16,
+                          color: appTextTertiary,
+                          fontSize: 15,
                         ),
                       ),
                     ],
@@ -1860,7 +4755,7 @@ class _HomePageState extends State<HomePage> {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 100.0),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -1878,6 +4773,9 @@ class _HomePageState extends State<HomePage> {
                         categoryColor: _getCategoryColor(entry.category),
                         onDelete: () => _deleteEntry(entry.id),
                         onStatusToggle: () => _toggleEntryStatus(entry.id),
+                        onUpdate: _updateEntry,
+                        categories: widget.categories,
+                        getCategoryColor: _getCategoryColor,
                         uiScale: widget.uiScale,
                       );
                     },
@@ -1899,6 +4797,9 @@ class TimestampListItem extends StatefulWidget {
   final Color categoryColor;
   final VoidCallback onDelete;
   final VoidCallback onStatusToggle;
+  final ValueChanged<TimestampEntry>? onUpdate;
+  final List<String>? categories;
+  final Color Function(String)? getCategoryColor;
   final double uiScale;
 
   const TimestampListItem({
@@ -1907,6 +4808,9 @@ class TimestampListItem extends StatefulWidget {
     required this.categoryColor,
     required this.onDelete,
     required this.onStatusToggle,
+    this.onUpdate,
+    this.categories,
+    this.getCategoryColor,
     required this.uiScale,
   });
 
@@ -1944,234 +4848,1497 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
     return '${diff.inSeconds}s';
   }
 
+  String _formatDurationMinutes(int totalMinutes) {
+    final h = totalMinutes ~/ 60;
+    final m = totalMinutes % 60;
+    if (h > 0 && m > 0) return '${h}h ${m}m';
+    if (h > 0) return '${h}h';
+    return '${m}m';
+  }
+
   Color _getAdjustedColor() {
-    final hsl = HSLColor.fromColor(widget.categoryColor);
-    if (widget.entry.status == 'todo') {
-      double factor;
-      if (widget.entry.targetDate != null) {
-        final now = DateTime.now();
-        final totalDuration = widget.entry.targetDate!.difference(widget.entry.timestamp).inSeconds;
-        final elapsed = now.difference(widget.entry.timestamp).inSeconds;
-        factor = totalDuration <= 0 ? 1.0 : (elapsed / totalDuration).clamp(0.0, 1.0);
-      } else {
-        final age = DateTime.now().difference(widget.entry.timestamp);
-        factor = (age.inSeconds / 86400.0).clamp(0.0, 1.0);
-      }
-      final newSaturation = (hsl.saturation + (0.3 * factor)).clamp(0.0, 1.0);
-      return hsl.withLightness((hsl.lightness + 0.2).clamp(0.0, 1.0)).withSaturation(newSaturation).toColor();
-    } else if (widget.entry.status == 'done') {
-      return hsl.withLightness((hsl.lightness - 0.2).clamp(0.0, 1.0)).toColor();
+    if (widget.entry.status == 'done') {
+      final hsl = HSLColor.fromColor(widget.categoryColor);
+      return hsl.withLightness((hsl.lightness - 0.08).clamp(0.0, 1.0)).toColor();
     }
+    // TODO와 일반 항목은 동일한 카테고리 색상
     return widget.categoryColor;
+  }
+
+  Widget _buildDDayBadge(DateTime targetDate, Color categoryColor, {bool compact = true}) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(targetDate.year, targetDate.month, targetDate.day);
+    final diff = target.difference(today).inDays;
+
+    String text;
+    Color badgeColor;
+
+    if (diff > 0) {
+      text = 'D-$diff';
+      badgeColor = diff <= 3 ? const Color(0xFFF59E0B) : categoryColor;
+    } else if (diff == 0) {
+      text = 'D-Day';
+      badgeColor = const Color(0xFFEF4444);
+    } else {
+      text = 'D+${diff.abs()}';
+      badgeColor = const Color(0xFFEF4444);
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 1.5 : 2.5,
+      ),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: badgeColor.withOpacity(diff <= 0 ? 0.6 : 0.35),
+          width: 1.0,
+        ),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.jetBrainsMono(
+          fontSize: (compact ? 8.5 : 10) * widget.uiScale,
+          fontWeight: FontWeight.w800,
+          color: badgeColor,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isExpandable = widget.entry.note.length > 40 ||
-        widget.entry.note.contains('\n') ||
-        widget.entry.imagePath != null ||
-        widget.entry.status == 'todo' ||
-        widget.entry.doneNote != null ||
-        widget.entry.doneImagePath != null;
+    final bool hasImage = widget.entry.imagePath != null || widget.entry.doneImagePath != null;
+    final bool hasLongText = widget.entry.note.contains('\n') || widget.entry.note.length > 30;
+    final bool hasDoneExtra = widget.entry.doneNote != null && widget.entry.doneNote!.isNotEmpty;
+    final bool isExpandable = hasImage || hasLongText || hasDoneExtra;
 
+    final currentTheme = ThemeController.instance.currentTheme;
+    final isDark = currentTheme.isDark;
     final adjustedColor = _getAdjustedColor();
+    final isDone = widget.entry.status == 'done';
+    final isTodo = widget.entry.status == 'todo';
+    final isNormal = widget.entry.status == 'none';
+    final bool showStartPrefix = isTodo || isDone || widget.entry.computedDurationMinutes != null;
 
-    return GestureDetector(
-      onTap: isExpandable ? () => setState(() => _isExpanded = !_isExpanded) : null,
-      child: AnimatedBuilder(
-        animation: _pulseAnimation,
-        builder: (context, child) {
-          final pulseValue = widget.entry.status == 'todo' ? _pulseAnimation.value : 1.0;
-          return CustomPaint(
-            painter: widget.entry.status == 'todo' 
-                ? DashedBorderPainter(color: adjustedColor.withOpacity(0.5 * pulseValue)) 
-                : null,
-            child: Container(
-              margin: EdgeInsets.only(bottom: 16 * widget.uiScale),
-              padding: EdgeInsets.all(20 * widget.uiScale),
-              decoration: BoxDecoration(
-                color: widget.entry.status == 'todo'
-                    ? adjustedColor.withOpacity(0.12 * pulseValue)
-                    : const Color(0xFF161922),
-                borderRadius: BorderRadius.circular(24),
-                border: widget.entry.status == 'todo'
-                    ? Border.all(color: adjustedColor.withOpacity(0.2 * pulseValue), width: 1.5)
-                    : Border.all(color: Colors.white.withOpacity(0.05)),
-                boxShadow: widget.entry.status == 'todo'
-                    ? [
-                        BoxShadow(
-                          color: adjustedColor.withOpacity(0.1 * pulseValue),
-                          blurRadius: 15 * pulseValue,
-                          spreadRadius: 2 * pulseValue,
-                        ),
-                      ]
-                    : null,
+    return Dismissible(
+      key: ValueKey(widget.entry.id),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        return await _showDeleteConfirmSheet(context);
+      },
+      background: Container(
+        margin: EdgeInsets.only(bottom: 12 * widget.uiScale),
+        padding: const EdgeInsets.only(right: 20),
+        alignment: Alignment.centerRight,
+        decoration: BoxDecoration(
+          color: Colors.redAccent.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
+            const SizedBox(width: 6),
+            Text(
+              '삭제',
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
               ),
-              child: Opacity(
-                opacity: widget.entry.status == 'todo' ? 1.0 : 1.0,
-                child: Row(
-                  children: [
-                    // Status Toggle Circle
-                    SizedBox(
-                      width: 36,
-                      child: GestureDetector(
-                        onTap: widget.onStatusToggle,
-                        child: widget.entry.status == 'todo'
-                            ? AnimatedScale(
-                                duration: const Duration(milliseconds: 200),
-                                scale: 1.1,
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
+            ),
+          ],
+        ),
+      ),
+      onDismissed: (_) => widget.onDelete(),
+      child: GestureDetector(
+        onTap: isExpandable ? () => setState(() => _isExpanded = !_isExpanded) : null,
+        child: AnimatedBuilder(
+          animation: _pulseAnimation,
+          builder: (context, child) {
+            final pulseValue = isTodo ? _pulseAnimation.value : 1.0;
+            return Container(
+              margin: EdgeInsets.only(bottom: 10 * widget.uiScale),
+              padding: EdgeInsets.symmetric(
+                horizontal: 13 * widget.uiScale,
+                vertical: 10 * widget.uiScale,
+              ),
+              decoration: BoxDecoration(
+                color: currentTheme.cardBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDone
+                      ? adjustedColor.withOpacity(isDark ? 0.42 : 0.6)
+                      : (isDark ? adjustedColor.withOpacity(0.24) : const Color(0xFFE2E8F0)),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark ? Colors.black.withOpacity(0.18) : Colors.black.withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: adjustedColor.withOpacity(isDone ? 0.08 : 0.04),
+                    blurRadius: 12,
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Full-width Category & Date Header Row (Right to the edge!)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: Center(
+                          child: isExpandable
+                              ? GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () => setState(() => _isExpanded = !_isExpanded),
+                                  child: AnimatedRotation(
+                                    turns: _isExpanded ? 0.5 : 0.0,
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 13 * widget.uiScale,
+                                      color: adjustedColor,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  width: 5,
+                                  height: 5,
                                   decoration: BoxDecoration(
+                                    color: adjustedColor,
                                     shape: BoxShape.circle,
-                                    color: adjustedColor.withOpacity(0.05),
-                                    border: Border.all(color: adjustedColor.withOpacity(0.5), width: 2.0),
-                                    boxShadow: [BoxShadow(color: adjustedColor.withOpacity(0.1), blurRadius: 10)],
-                                  ),
-                                  child: Center(
-                                    child: Icon(Icons.check_rounded, size: 20, color: adjustedColor.withOpacity(0.7)),
                                   ),
                                 ),
-                              )
-                            : Container(
-                                width: 14,
-                                height: 54,
-                                decoration: BoxDecoration(
-                                  color: adjustedColor,
-                                  borderRadius: BorderRadius.circular(7),
-                                  boxShadow: [BoxShadow(color: adjustedColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 3))],
-                                ),
-                                child: widget.entry.status == 'done' 
-                                    ? const Center(child: Icon(Icons.check_rounded, size: 10, color: Colors.white)) 
-                                    : null,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: 120 * widget.uiScale),
+                        child: Text(
+                          widget.entry.category,
+                          style: GoogleFonts.inter(
+                            fontSize: 11 * widget.uiScale,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white.withOpacity(0.55) : const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (hasImage && !_isExpanded) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.photo_camera_rounded,
+                                size: 10,
+                                color: isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF64748B),
                               ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '사진',
+                                style: GoogleFonts.inter(
+                                  fontSize: 8.5 * widget.uiScale,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (isTodo) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: adjustedColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'TODO',
+                            style: GoogleFonts.inter(
+                              fontSize: 8.5 * widget.uiScale,
+                              fontWeight: FontWeight.w700,
+                              color: adjustedColor,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        if (widget.entry.targetDate != null) ...[
+                          const SizedBox(width: 6),
+                          _buildDDayBadge(widget.entry.targetDate!, adjustedColor, compact: true),
+                        ],
+                      ] else if (isDone) ...[
+                        const SizedBox(width: 8),
+                        if (widget.entry.doneTimestamp != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: adjustedColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.timer_outlined,
+                                  size: 9.5 * widget.uiScale,
+                                  color: adjustedColor.withOpacity(0.9),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${_getDurationString(widget.entry.timestamp, widget.entry.doneTimestamp!)} 소요',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 8.5 * widget.uiScale,
+                                    fontWeight: FontWeight.w600,
+                                    color: adjustedColor.withOpacity(0.9),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'DONE',
+                              style: GoogleFonts.inter(
+                                fontSize: 8.5 * widget.uiScale,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                      ],
+                      const Spacer(),
+                      Text(
+                        DateFormat('yyyy.MM.dd').format(widget.entry.timestamp),
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 10 * widget.uiScale,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Top Right Action Button
+                      if (isTodo)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: widget.onStatusToggle,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: adjustedColor.withOpacity(0.85),
+                                  width: 1.8,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      else if (isDone)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: widget.onStatusToggle,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: adjustedColor,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.check_rounded,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _showEntryOptionsSheet(context, adjustedColor),
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.more_vert_rounded,
+                              color: isDark ? Colors.white.withOpacity(0.55) : Colors.black.withOpacity(0.55),
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+
+                  // 2. Start Time & Main Note Text (Full Width)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 20 * widget.uiScale,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: Center(
+                                child: Icon(
+                                  showStartPrefix
+                                      ? Icons.play_circle_outline_rounded
+                                      : Icons.access_time_rounded,
+                                  size: (showStartPrefix ? 11 : 10) * widget.uiScale,
+                                  color: showStartPrefix
+                                      ? adjustedColor.withOpacity(0.75)
+                                      : (isDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              DateFormat('HH:mm').format(widget.entry.timestamp),
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9.0 * widget.uiScale,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? Colors.white.withOpacity(0.5) : const Color(0xFF64748B),
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Container(
+                          constraints: BoxConstraints(minHeight: 20 * widget.uiScale),
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            widget.entry.note.isEmpty ? (hasImage ? '사진 메모' : '기록된 순간') : widget.entry.note,
+                            style: GoogleFonts.inter(
+                              color: isDone
+                                  ? (isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF64748B))
+                                  : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                              fontSize: 13.5 * widget.uiScale,
+                              fontWeight: FontWeight.w500,
+                              height: 1.3,
+                            ),
+                            maxLines: (isExpandable && !_isExpanded) ? 1 : null,
+                            overflow: (isExpandable && !_isExpanded) ? TextOverflow.ellipsis : TextOverflow.visible,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Target Date (TODO ONLY)
+                  if (isTodo && widget.entry.targetDate != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 12,
+                          color: adjustedColor.withOpacity(0.8),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          DateFormat('yyyy-MM-dd').format(widget.entry.targetDate!),
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 10 * widget.uiScale,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF475569),
+                          ),
+                        ),
+                        const Spacer(),
+                        _buildDDayBadge(widget.entry.targetDate!, adjustedColor, compact: false),
+                      ],
+                    ),
+                  ],
+
+                  // 1. Photo (Shown under note when expanded, rectangular without rounded corners)
+                  if (widget.entry.imagePath != null && _isExpanded)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxHeight: 520,
+                          ),
+                          child: Image.file(
+                            File(widget.entry.imagePath!),
+                            width: double.infinity,
+                            fit: BoxFit.fitWidth,
+                            alignment: Alignment.center,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 20),
-                    // Content
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+
+                  // 2. Completed Info (Left-aligned, clearly separated if TODO image exists)
+                  if (isDone && widget.entry.doneTimestamp != null) ...[
+                    if (widget.entry.imagePath != null && _isExpanded) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        height: 1,
+                        width: double.infinity,
+                        color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.08),
+                      ),
+                      const SizedBox(height: 10),
+                    ] else ...[
+                      const SizedBox(height: 3),
+                    ],
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 20 * widget.uiScale,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(color: adjustedColor.withOpacity(0.12), borderRadius: BorderRadius.circular(7)),
-                                child: Text(widget.entry.category.toUpperCase(), style: GoogleFonts.inter(fontSize: 7.5, fontWeight: FontWeight.bold, color: adjustedColor.withOpacity(0.8), letterSpacing: 1.2)),
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.check_circle_outline_rounded,
+                                    size: 11 * widget.uiScale,
+                                    color: adjustedColor.withOpacity(0.85),
+                                  ),
+                                ),
                               ),
-                              if (widget.entry.status == 'todo') ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(color: adjustedColor, borderRadius: BorderRadius.circular(7)),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 4,
-                                        height: 4,
-                                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                              const SizedBox(width: 3),
+                              Text(
+                                DateFormat('HH:mm').format(widget.entry.doneTimestamp!),
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 9.0 * widget.uiScale,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? Colors.white.withOpacity(0.5) : const Color(0xFF64748B),
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Container(
+                            constraints: BoxConstraints(minHeight: 20 * widget.uiScale),
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              (widget.entry.doneNote != null && widget.entry.doneNote!.trim().isNotEmpty)
+                                  ? widget.entry.doneNote!
+                                  : (widget.entry.note.isEmpty ? (hasImage ? '사진 메모' : '완료됨') : widget.entry.note),
+                              style: GoogleFonts.inter(
+                                color: isDark ? Colors.white.withOpacity(0.85) : const Color(0xFF1E293B),
+                                fontSize: 13.5 * widget.uiScale,
+                                fontWeight: FontWeight.w500,
+                                height: 1.3,
+                              ),
+                              maxLines: (isExpandable && !_isExpanded) ? 1 : null,
+                              overflow: (isExpandable && !_isExpanded) ? TextOverflow.ellipsis : TextOverflow.visible,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // 3. Duration / Completion for normal entry with duration (Left-aligned)
+                  if (widget.entry.computedDurationMinutes != null && !isDone) ...[
+                    if (widget.entry.imagePath != null && _isExpanded) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        height: 1,
+                        width: double.infinity,
+                        color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.08),
+                      ),
+                      const SizedBox(height: 10),
+                    ] else ...[
+                      const SizedBox(height: 3),
+                    ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: Center(
+                            child: Icon(
+                              Icons.check_circle_outline_rounded,
+                              size: 11 * widget.uiScale,
+                              color: adjustedColor.withOpacity(0.85),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          DateFormat('HH:mm').format(widget.entry.timestamp.add(Duration(minutes: widget.entry.computedDurationMinutes!))),
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9.0 * widget.uiScale,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? Colors.white.withOpacity(0.5) : const Color(0xFF64748B),
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 11 * widget.uiScale,
+                          color: adjustedColor.withOpacity(0.8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_formatDurationMinutes(widget.entry.computedDurationMinutes!)} 소요',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9.5 * widget.uiScale,
+                            fontWeight: FontWeight.w600,
+                            color: adjustedColor.withOpacity(0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // 4. Task Completion Photo (Clearly separated under completed section, rectangular without rounded corners)
+                  if (isDone && widget.entry.doneImagePath != null && _isExpanded)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxHeight: 520,
+                          ),
+                          child: Image.file(
+                            File(widget.entry.doneImagePath!),
+                            width: double.infinity,
+                            fit: BoxFit.fitWidth,
+                            alignment: Alignment.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _showDeleteConfirmSheet(BuildContext context) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: appCardBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 20,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '기록 삭제',
+                        style: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: appText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '이 기록을 정말 삭제하시겠습니까?\n삭제된 내용은 복구할 수 없습니다.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: appTextSecondary,
+                    ),
+                  ),
+                  if (widget.entry.note.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: appSubtleBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: appBorder,
+                        ),
+                      ),
+                      child: Text(
+                        widget.entry.note,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: appText,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 76,
+                        height: 46,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: TextButton.styleFrom(
+                            backgroundColor: appSubtleBg,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(
+                            '취소',
+                            style: GoogleFonts.inter(
+                              color: appTextSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFEF4444),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              '삭제',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  void _showEntryOptionsSheet(BuildContext context, Color adjustedColor) {
+    String selectedCategory = widget.entry.category;
+    bool isTodo = widget.entry.status == 'todo';
+    DateTime? targetDate = widget.entry.targetDate;
+    String? selectedImagePath = widget.entry.imagePath;
+
+    final TextEditingController editNoteController =
+        TextEditingController(text: widget.entry.note);
+
+    int currentMinutes = widget.entry.computedDurationMinutes ?? 0;
+    int hours = currentMinutes ~/ 60;
+    int minutes = currentMinutes % 60;
+
+    final TextEditingController hoursController =
+        TextEditingController(text: hours > 0 ? hours.toString() : '');
+    final TextEditingController minutesController =
+        TextEditingController(text: minutes > 0 ? minutes.toString() : '');
+
+    Future<void> pickImage(ImageSource source, StateSetter setSheetState) async {
+      if (source == ImageSource.camera) {
+        final String? capturedPath = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(builder: (context) => const CameraPage()),
+        );
+        if (capturedPath != null) {
+          final directory = await getApplicationDocumentsDirectory();
+          final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(capturedPath)}';
+          final saved = await File(capturedPath).copy('${directory.path}/$fileName');
+          setSheetState(() {
+            selectedImagePath = saved.path;
+          });
+        }
+      } else {
+        final picker = ImagePicker();
+        final picked = await picker.pickImage(source: source, imageQuality: 85);
+        if (picked != null) {
+          final directory = await getApplicationDocumentsDirectory();
+          final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(picked.path)}';
+          final saved = await File(picked.path).copy('${directory.path}/$fileName');
+          setSheetState(() {
+            selectedImagePath = saved.path;
+          });
+        }
+      }
+    }
+
+    Future<void> pickTargetDate(StateSetter setSheetState, Color catColor) async {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: targetDate ?? DateTime.now(),
+        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+        lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+        builder: (context, child) => Theme(
+          data: (isAppDark ? ThemeData.dark() : ThemeData.light()).copyWith(
+            colorScheme: isAppDark
+                ? ColorScheme.dark(
+                    primary: catColor,
+                    surface: appCardBg,
+                  )
+                : ColorScheme.light(
+                    primary: catColor,
+                    surface: appCardBg,
+                  ),
+          ),
+          child: child!,
+        ),
+      );
+      if (picked != null) {
+        setSheetState(() {
+          targetDate = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+        });
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+            final activeCategoryColor = widget.getCategoryColor != null
+                ? widget.getCategoryColor!(selectedCategory)
+                : widget.categoryColor;
+
+            void addMinutes(int delta) {
+              int total = (hours * 60) + minutes + delta;
+              if (total < 0) total = 0;
+              setSheetState(() {
+                hours = total ~/ 60;
+                minutes = total % 60;
+                hoursController.text = hours > 0 ? hours.toString() : '';
+                minutesController.text = minutes > 0 ? minutes.toString() : '';
+              });
+            }
+
+            void resetTime() {
+              setSheetState(() {
+                hours = 0;
+                minutes = 0;
+                hoursController.text = '';
+                minutesController.text = '';
+              });
+            }
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.88,
+              ),
+              decoration: BoxDecoration(
+                color: appCardBg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomInset),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottomPadding),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // iOS Style Handle Bar
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onVerticalDragUpdate: (details) {
+                            if (details.primaryDelta! > 7) {
+                              Navigator.pop(context);
+                            }
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Center(
+                              child: Container(
+                                width: 36,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Compact Header (Identical to Add Sheet)
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: activeCategoryColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.edit_note_rounded,
+                                size: 16,
+                                color: activeCategoryColor,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '기록 수정',
+                              style: GoogleFonts.inter(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                                color: appText,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => Navigator.pop(ctx),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: appSubtleBg,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 16,
+                                  color: appTextSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Category Chips (Identical to Add Sheet)
+                        if (widget.categories != null && widget.categories!.isNotEmpty) ...[
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: widget.categories!.map((cat) {
+                                final isSelected = selectedCategory == cat;
+                                final catColor = widget.getCategoryColor != null
+                                    ? widget.getCategoryColor!(cat)
+                                    : widget.categoryColor;
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6.0),
+                                  child: InkWell(
+                                    onTap: () {
+                                      setSheetState(() => selectedCategory = cat);
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 180),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
                                       ),
-                                      const SizedBox(width: 4),
-                                      Text('TODO', style: GoogleFonts.inter(fontSize: 7.5, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2)),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? catColor.withOpacity(isAppDark ? 0.22 : 0.15)
+                                            : (isAppDark ? const Color(0xFF20242F) : const Color(0xFFF1F5F9)),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? catColor
+                                              : appBorder,
+                                          width: 1.2,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              color: catColor,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            cat,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11.5 * widget.uiScale,
+                                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                              color: isSelected ? appText : appTextSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        // TODO Switch (Identical to Add Sheet)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: appSubtleBg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: appBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.task_alt_rounded,
+                                size: 16,
+                                color: isTodo ? activeCategoryColor : appTextTertiary,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'TODO로 등록',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isTodo ? appText : appTextSecondary,
+                                ),
+                              ),
+                              const Spacer(),
+                              Transform.scale(
+                                scale: 0.75,
+                                child: Switch(
+                                  value: isTodo,
+                                  onChanged: (val) {
+                                    setSheetState(() => isTodo = val);
+                                  },
+                                  activeColor: activeCategoryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        if (isTodo) ...[
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () => pickTargetDate(setSheetState, activeCategoryColor),
+                            borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: appSubtleBg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: appBorder),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.calendar_today_rounded, size: 14, color: appTextTertiary),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '마감 기한',
+                                    style: GoogleFonts.inter(fontSize: 12.5, color: appTextSecondary),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    targetDate == null ? '날짜 선택' : DateFormat('yyyy.MM.dd').format(targetDate!),
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: targetDate != null ? activeCategoryColor : appTextTertiary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        if (!isTodo) ...[
+                          const SizedBox(height: 12),
+
+                          // Spent Time (소요 시간 입력 - 일반 항목 전용)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: appSubtleBg,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: appBorder),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.timer_outlined, size: 15, color: appTextTertiary),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '소요 시간 (통계용)',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: appTextSecondary,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      (hours * 60 + minutes) > 0
+                                          ? '${hours > 0 ? "${hours}시간 " : ""}${minutes}분'
+                                          : '미설정',
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: (hours * 60 + minutes) > 0 ? activeCategoryColor : appTextTertiary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        height: 38,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        decoration: BoxDecoration(
+                                          color: isAppDark ? Colors.white.withOpacity(0.04) : Colors.white,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: appBorder),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: TextField(
+                                                controller: hoursController,
+                                                keyboardType: TextInputType.number,
+                                                style: GoogleFonts.jetBrainsMono(
+                                                  fontSize: 13.5,
+                                                  color: appText,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                decoration: InputDecoration(
+                                                  hintText: '0',
+                                                  hintStyle: TextStyle(color: appTextTertiary),
+                                                  border: InputBorder.none,
+                                                  isDense: true,
+                                                ),
+                                                onChanged: (val) {
+                                                  final p = int.tryParse(val) ?? 0;
+                                                  setSheetState(() => hours = p.clamp(0, 999));
+                                                },
+                                              ),
+                                            ),
+                                            Text('시간', style: GoogleFonts.inter(fontSize: 11.5, color: appTextTertiary)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Container(
+                                        height: 38,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        decoration: BoxDecoration(
+                                          color: isAppDark ? Colors.white.withOpacity(0.04) : Colors.white,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: appBorder),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: TextField(
+                                                controller: minutesController,
+                                                keyboardType: TextInputType.number,
+                                                style: GoogleFonts.jetBrainsMono(
+                                                  fontSize: 13.5,
+                                                  color: appText,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                decoration: InputDecoration(
+                                                  hintText: '0',
+                                                  hintStyle: TextStyle(color: appTextTertiary),
+                                                  border: InputBorder.none,
+                                                  isDense: true,
+                                                ),
+                                                onChanged: (val) {
+                                                  final p = int.tryParse(val) ?? 0;
+                                                  setSheetState(() => minutes = p.clamp(0, 59));
+                                                },
+                                              ),
+                                            ),
+                                            Text('분', style: GoogleFonts.inter(fontSize: 11.5, color: appTextTertiary)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  physics: const BouncingScrollPhysics(),
+                                  child: Row(
+                                    children: [
+                                      _buildPresetChip('+15분', () => addMinutes(15), activeCategoryColor),
+                                      const SizedBox(width: 6),
+                                      _buildPresetChip('+30분', () => addMinutes(30), activeCategoryColor),
+                                      const SizedBox(width: 6),
+                                      _buildPresetChip('+1시간', () => addMinutes(60), activeCategoryColor),
+                                      const SizedBox(width: 6),
+                                      _buildPresetChip('+2시간', () => addMinutes(120), activeCategoryColor),
+                                      const SizedBox(width: 6),
+                                      _buildPresetChip('초기화', resetTime, appTextTertiary, isOutline: true),
                                     ],
                                   ),
                                 ),
                               ],
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            widget.entry.note.isEmpty ? 'Recorded Moment' : widget.entry.note,
-                            style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                            maxLines: _isExpanded ? null : 5,
-                            overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(widget.entry.timestamp), style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.4))),
-                            ],
-                          ),
-                          // Target Date (TODO ONLY)
-                          if (widget.entry.status == 'todo' && widget.entry.targetDate != null) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Icon(Icons.event_available_rounded, size: 12, color: adjustedColor.withOpacity(0.6)),
-                                const SizedBox(width: 4),
-                                Text(DateFormat('yyyy-MM-dd').format(widget.entry.targetDate!), style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w600, color: adjustedColor.withOpacity(0.6))),
-                                const Spacer(),
-                                if (DateTime.now().isAfter(widget.entry.targetDate!))
-                                  AnimatedBuilder(
-                                    animation: _pulseAnimation,
-                                    builder: (context, child) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.1 + (0.1 * _pulseAnimation.value)),
-                                          borderRadius: BorderRadius.circular(4),
-                                          border: Border.all(color: Colors.red.withOpacity(0.3 + (0.2 * _pulseAnimation.value))),
-                                        ),
-                                        child: Text('OVERDUE', style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.red)),
-                                      );
-                                    },
-                                  ),
-                              ],
                             ),
-                          ],
-                          // Image
-                          if (widget.entry.imagePath != null)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.file(File(widget.entry.imagePath!), width: double.infinity, fit: BoxFit.fitWidth),
-                              ),
-                            ),
-                          // Completed Info
-                          if (widget.entry.status == 'done' && widget.entry.doneTimestamp != null) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Text('COMPLETED', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: adjustedColor, letterSpacing: 0.5)),
-                                const SizedBox(width: 8),
-                                Icon(Icons.timer_rounded, size: 11, color: adjustedColor.withOpacity(0.6)),
-                                const SizedBox(width: 4),
-                                Text(_getDurationString(widget.entry.timestamp, widget.entry.doneTimestamp!), style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.w500, color: adjustedColor.withOpacity(0.6))),
-                              ],
-                            ),
-                            if (widget.entry.doneNote != null && widget.entry.doneNote!.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(widget.entry.doneNote!, style: GoogleFonts.inter(color: Colors.white.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w500)),
-                              ),
-                            if (widget.entry.doneImagePath != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.file(File(widget.entry.doneImagePath!), width: double.infinity, fit: BoxFit.fitWidth),
-                                ),
-                              ),
-                          ],
+                          ),
                         ],
-                      ),
+
+                        const SizedBox(height: 12),
+
+                        // Image Preview (Identical to Add Sheet)
+                        if (selectedImagePath != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Image.file(
+                                    File(selectedImagePath!),
+                                    height: 130,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setSheetState(() => selectedImagePath = null);
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Note Input (Center Aligned)
+                        TextField(
+                          controller: editNoteController,
+                          maxLines: 4,
+                          minLines: 2,
+                          textAlign: TextAlign.center,
+                          textAlignVertical: TextAlignVertical.center,
+                          onChanged: (_) => setSheetState(() {}),
+                          style: GoogleFonts.inter(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w500,
+                            color: appText,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '지금 무슨 일이 일어나고 있나요?',
+                            hintStyle: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w400,
+                              color: appTextTertiary,
+                            ),
+                            filled: true,
+                            fillColor: appSubtleBg,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            prefixIcon: const SizedBox(width: 72),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 72, maxWidth: 72, minHeight: 32),
+                            suffixIconConstraints: const BoxConstraints(minWidth: 72, maxWidth: 72, minHeight: 32),
+                            suffixIcon: Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.camera_alt_outlined, size: 19),
+                                    color: appTextSecondary,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    padding: EdgeInsets.zero,
+                                    onPressed: () => pickImage(ImageSource.camera, setSheetState),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.photo_library_outlined, size: 19),
+                                    color: appTextSecondary,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    padding: EdgeInsets.zero,
+                                    onPressed: () => pickImage(ImageSource.gallery, setSheetState),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Action Buttons Row (Compact Cancel + Wide Main Button)
+                        Builder(
+                          builder: (context) {
+                            final bool canUpdate = editNoteController.text.trim().isNotEmpty || selectedImagePath != null;
+                            return Row(
+                              children: [
+                                SizedBox(
+                                  width: 76,
+                                  height: 46,
+                                  child: TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    style: TextButton.styleFrom(
+                                      backgroundColor: appSubtleBg,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                    child: Text(
+                                      '취소',
+                                      style: GoogleFonts.inter(
+                                        color: appTextSecondary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 46,
+                                    child: ElevatedButton(
+                                      onPressed: canUpdate
+                                          ? () {
+                                              final totalMins = (hours * 60) + minutes;
+                                              if (widget.onUpdate != null) {
+                                                widget.onUpdate!(widget.entry.copyWith(
+                                                  note: editNoteController.text.trim(),
+                                                  category: selectedCategory,
+                                                  status: isTodo ? 'todo' : 'none',
+                                                  targetDate: isTodo ? targetDate : null,
+                                                  imagePath: selectedImagePath,
+                                                  clearImage: selectedImagePath == null,
+                                                  manualDurationMinutes: (!isTodo && totalMins > 0) ? totalMins : null,
+                                                  clearManualDuration: isTodo || totalMins <= 0,
+                                                ));
+                                              }
+                                              Navigator.pop(ctx);
+                                            }
+                                          : null,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: canUpdate
+                                            ? activeCategoryColor
+                                            : (isAppDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06)),
+                                        foregroundColor: canUpdate
+                                            ? (activeCategoryColor.computeLuminance() > 0.5 ? Colors.black : Colors.white)
+                                            : (isAppDark ? Colors.white30 : Colors.black26),
+                                        disabledBackgroundColor: isAppDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06),
+                                        disabledForegroundColor: isAppDark ? Colors.white30 : Colors.black26,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '기록 수정 완료',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    // Delete Button
-                    IconButton(
-                      icon: Icon(Icons.delete_outline_rounded, color: Colors.white.withOpacity(0.2), size: 22),
-                      onPressed: widget.onDelete,
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPresetChip(String label, VoidCallback onTap, Color color, {bool isOutline = false}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isOutline ? Colors.transparent : color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: color.withOpacity(isOutline ? 0.4 : 0.25),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: (color == Colors.white38 || color == appTextTertiary) ? appTextSecondary : color,
+          ),
+        ),
       ),
     );
   }
@@ -2226,15 +6393,22 @@ class DashedBorderPainter extends CustomPainter {
       color != oldDelegate.color;
 }
 
-class CategoryView extends StatelessWidget {
+class CategoryView extends StatefulWidget {
   final ValueNotifier<List<TimestampEntry>> entriesNotifier;
   final Function(String) onDelete;
   final Function(String) onToggle;
   final Function(String) onClearCategory;
   final Function(String) onDeleteCategory;
+  final Function(TimestampEntry)? onUpdateEntry;
   final double uiScale;
   final List<String> categories;
   final Map<String, Color> categoryColors;
+  final String defaultCategory;
+  final Function(String, Color) onAddCategory;
+  final Function(int, int) onReorderCategories;
+  final Function(String) onSetDefaultCategory;
+  final Function(String, Color) onUpdateCategoryColor;
+  final bool Function(String, String)? onRenameCategory;
 
   const CategoryView({
     super.key,
@@ -2243,195 +6417,1274 @@ class CategoryView extends StatelessWidget {
     required this.onToggle,
     required this.onClearCategory,
     required this.onDeleteCategory,
+    this.onUpdateEntry,
     required this.uiScale,
     required this.categories,
     required this.categoryColors,
+    required this.defaultCategory,
+    required this.onAddCategory,
+    required this.onReorderCategories,
+    required this.onSetDefaultCategory,
+    required this.onUpdateCategoryColor,
+    this.onRenameCategory,
   });
+
+  @override
+  State<CategoryView> createState() => _CategoryViewState();
+}
+
+class _CategoryViewState extends State<CategoryView> {
+  void _navigateToCategoryDetail(BuildContext context, String cat, Color color) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CategoryDetailView(
+          category: cat,
+          entriesNotifier: widget.entriesNotifier,
+          categoryColor: color,
+          onDelete: widget.onDelete,
+          onToggle: widget.onToggle,
+          onClearCategory: widget.onClearCategory,
+          onUpdateEntry: widget.onUpdateEntry,
+          categories: widget.categories,
+          categoryColors: widget.categoryColors,
+          uiScale: widget.uiScale,
+          onUpdateCategoryColor: widget.onUpdateCategoryColor,
+          onRenameCategory: widget.onRenameCategory,
+        ),
+      ),
+    );
+  }
 
   final Map<String, IconData> _categoryIcons = const {
     'General': Icons.folder_outlined,
-    'Work': Icons.work_outline,
-    'Personal': Icons.person_outline,
-    'Health': Icons.favorite_outline,
-    'Study': Icons.book_outlined,
+    'Work': Icons.work_outline_rounded,
+    'Personal': Icons.person_outline_rounded,
+    'Health': Icons.favorite_outline_rounded,
+    'Study': Icons.menu_book_rounded,
   };
+
+  IconData _getCategoryIcon(String cat) {
+    if (_categoryIcons.containsKey(cat)) return _categoryIcons[cat]!;
+    final lower = cat.toLowerCase();
+    if (lower.contains('work') || lower.contains('업무') || lower.contains('회사') || lower.contains('일')) {
+      return Icons.work_outline_rounded;
+    }
+    if (lower.contains('study') || lower.contains('공부') || lower.contains('학습') || lower.contains('독서')) {
+      return Icons.school_outlined;
+    }
+    if (lower.contains('health') || lower.contains('운동') || lower.contains('건강') || lower.contains('헬스')) {
+      return Icons.fitness_center_rounded;
+    }
+    if (lower.contains('person') || lower.contains('개인') || lower.contains('일상') || lower.contains('생각')) {
+      return Icons.person_outline_rounded;
+    }
+    if (lower.contains('food') || lower.contains('음식') || lower.contains('식사') || lower.contains('맛집')) {
+      return Icons.restaurant_rounded;
+    }
+    if (lower.contains('shop') || lower.contains('쇼핑') || lower.contains('구매')) {
+      return Icons.shopping_bag_outlined;
+    }
+    if (lower.contains('money') || lower.contains('finance') || lower.contains('돈') || lower.contains('금융') || lower.contains('가계부')) {
+      return Icons.account_balance_wallet_outlined;
+    }
+    if (lower.contains('trip') || lower.contains('travel') || lower.contains('여행')) {
+      return Icons.flight_takeoff_rounded;
+    }
+    if (lower.contains('idea') || lower.contains('아이디어')) {
+      return Icons.lightbulb_outline_rounded;
+    }
+    if (lower.contains('hobby') || lower.contains('취미')) {
+      return Icons.palette_outlined;
+    }
+    return Icons.folder_outlined;
+  }
+
+  void _showDeleteCategorySheet(BuildContext context, String cat) {
+    showModalBottomSheet(
+      context: context,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: appCardBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragUpdate: (details) {
+                      if (details.primaryDelta! > 7) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 20,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '카테고리 삭제',
+                        style: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: appText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '"$cat" 카테고리와 연관된 모든 기록이 함께 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      height: 1.45,
+                      color: appTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Action Buttons Row (Compact Cancel + Wide Main Button)
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 76,
+                        height: 46,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            backgroundColor: appSubtleBg,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(
+                            '취소',
+                            style: GoogleFonts.inter(
+                              color: appTextSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              widget.onDeleteCategory(cat);
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFEF4444),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              '삭제',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditCategorySheet(BuildContext context, String currentName) {
+    final TextEditingController nameController = TextEditingController(text: currentName);
+    final Color color = widget.categoryColors[currentName] ?? const Color(0xFF6366F1);
+    String? errorText;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return Container(
+              decoration: BoxDecoration(
+                color: appCardBg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, 24 + bottomInset),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onVerticalDragUpdate: (details) {
+                        if (details.primaryDelta! > 7) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.16),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.edit_rounded, size: 16, color: color),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '카테고리 이름 변경',
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                            color: appText,
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: appSubtleBg,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 16,
+                              color: appTextSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      '새 카테고리 이름',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: appTextTertiary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: nameController,
+                      autofocus: true,
+                      style: GoogleFonts.inter(
+                        color: appText,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '카테고리 이름을 입력하세요',
+                        hintStyle: GoogleFonts.inter(color: appTextTertiary),
+                        filled: true,
+                        fillColor: appSubtleBg,
+                        errorText: errorText,
+                        errorStyle: GoogleFonts.inter(color: Colors.redAccent, fontSize: 11),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(color: color, width: 1.5),
+                        ),
+                      ),
+                      onChanged: (val) {
+                        final trimmed = val.trim();
+                        if (trimmed.isEmpty) {
+                          setSheetState(() => errorText = '이름을 입력해주세요.');
+                        } else if (trimmed != currentName && widget.categories.contains(trimmed)) {
+                          setSheetState(() => errorText = '이미 존재하는 카테고리 이름입니다.');
+                        } else {
+                          if (errorText != null) {
+                            setSheetState(() => errorText = null);
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    // Action Buttons Row (Compact Cancel + Wide Main Button)
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 76,
+                          height: 46,
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              backgroundColor: appSubtleBg,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: Text(
+                              '취소',
+                              style: GoogleFonts.inter(
+                                color: appTextSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: SizedBox(
+                            height: 46,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                final newName = nameController.text.trim();
+                                if (newName.isEmpty) {
+                                  setSheetState(() => errorText = '이름을 입력해주세요.');
+                                  return;
+                                }
+                                if (newName != currentName && widget.categories.contains(newName)) {
+                                  setSheetState(() => errorText = '이미 존재하는 카테고리 이름입니다.');
+                                  return;
+                                }
+
+                                if (newName != currentName && widget.onRenameCategory != null) {
+                                  widget.onRenameCategory!(currentName, newName);
+                                }
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: color,
+                                foregroundColor: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              child: Text(
+                                '저장',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showCategoryOptionsSheet(BuildContext context, String cat) {
+    final color = widget.categoryColors[cat] ?? const Color(0xFF6366F1);
+
+    showModalBottomSheet(
+      context: context,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: appCardBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragUpdate: (details) {
+                      if (details.primaryDelta! > 7) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(_getCategoryIcon(cat), size: 18, color: color),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          cat,
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                            color: appText,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  ListTile(
+                    leading: Icon(Icons.edit_outlined, color: appTextSecondary, size: 20),
+                    title: Text(
+                      '이름 변경',
+                      style: GoogleFonts.inter(color: appText, fontSize: 14.5, fontWeight: FontWeight.w600),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showEditCategorySheet(context, cat);
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.palette_outlined, color: color, size: 20),
+                    title: Text(
+                      '색상 변경',
+                      style: GoogleFonts.inter(color: appText, fontSize: 14.5, fontWeight: FontWeight.w600),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final picked = await showCustomColorPickerDialog(
+                        context,
+                        initialColor: color,
+                      );
+                      if (picked != null) {
+                        widget.onUpdateCategoryColor(cat, picked);
+                      }
+                    },
+                  ),
+                  if (cat != 'General')
+                    ListTile(
+                      leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
+                      title: Text(
+                        '카테고리 삭제',
+                        style: GoogleFonts.inter(color: const Color(0xFFEF4444), fontSize: 14.5, fontWeight: FontWeight.w600),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showDeleteCategorySheet(context, cat);
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showReorderAndDefaultSheet(BuildContext context) {
+    final List<String> sheetCategories = List<String>.from(widget.categories);
+    String sheetDefault = widget.defaultCategory;
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              ),
+              decoration: BoxDecoration(
+                color: appCardBg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onVerticalDragUpdate: (details) {
+                          if (details.primaryDelta! > 7) {
+                            Navigator.pop(context);
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Center(
+                            child: Container(
+                              width: 36,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '카테고리 순서 및 기본값 설정',
+                                style: GoogleFonts.inter(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                  color: appText,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '드래그하여 순서 변경 · 별표를 눌러 기본 카테고리 지정',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  color: appTextTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            color: appTextSecondary,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Flexible(
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            canvasColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                          ),
+                          child: ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: sheetCategories.length,
+                            onReorder: (oldIndex, newIndex) {
+                              widget.onReorderCategories(oldIndex, newIndex);
+                              if (oldIndex < newIndex) {
+                                newIndex -= 1;
+                              }
+                              final item = sheetCategories.removeAt(oldIndex);
+                              sheetCategories.insert(newIndex, item);
+                              setSheetState(() {});
+                            },
+                            itemBuilder: (context, index) {
+                              final cat = sheetCategories[index];
+                              final color = widget.categoryColors[cat] ?? const Color(0xFF6366F1);
+                              final bool isDefault = cat == sheetDefault;
+
+                              return Container(
+                                key: ValueKey('order_$cat'),
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: appSubtleBg,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isDefault ? Colors.amber.withOpacity(0.5) : appBorder,
+                                    width: isDefault ? 1.4 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: color,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: color.withOpacity(0.4),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            cat,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 14.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: appText,
+                                            ),
+                                          ),
+                                          if (isDefault) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '기본 카테고리 (작성 시 자동 선택)',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.amber,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    // Default button
+                                    InkWell(
+                                      onTap: () {
+                                        widget.onSetDefaultCategory(cat);
+                                        sheetDefault = cat;
+                                        setSheetState(() {});
+                                      },
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: isDefault
+                                              ? Colors.amber.withOpacity(0.18)
+                                              : (isAppDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04)),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isDefault ? Icons.star_rounded : Icons.star_outline_rounded,
+                                              size: 16,
+                                              color: isDefault ? Colors.amber : appTextTertiary,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              isDefault ? '기본' : '기본설정',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11,
+                                                fontWeight: isDefault ? FontWeight.w700 : FontWeight.w500,
+                                                color: isDefault ? Colors.amber : appTextSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    // Drag handle
+                                    ReorderableDragStartListener(
+                                      index: index,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        child: Icon(
+                                          Icons.drag_handle_rounded,
+                                          size: 20,
+                                          color: appTextTertiary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: themeAccent,
+                            foregroundColor: themeAccent.computeLuminance() > 0.6 ? Colors.black : Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            '완료',
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildBentoView(
+    BuildContext context,
+    List<TimestampEntry> currentEntries,
+    AppTheme theme,
+    Color themeAccent,
+  ) {
+    final isDark = theme.isDark;
+    if (widget.categories.isEmpty) {
+      return Center(
+        child: Text(
+          '카테고리가 없습니다.',
+          style: GoogleFonts.inter(color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+        ),
+      );
+    }
+
+    final heroCat = widget.categories.contains(widget.defaultCategory)
+        ? widget.defaultCategory
+        : widget.categories.first;
+    final subCategories = widget.categories.where((c) => c != heroCat).toList();
+
+    final heroEntries = currentEntries.where((e) => e.category == heroCat).toList();
+    final heroCount = heroEntries.length;
+    final heroTodoCount = heroEntries.where((e) => e.status == 'todo').length;
+    final heroDoneCount = heroEntries.where((e) => e.status == 'done').length;
+    final heroTotal = heroTodoCount + heroDoneCount;
+    final heroDoneRate = heroTotal > 0 ? (heroDoneCount / heroTotal) : 0.0;
+    final heroColor = widget.categoryColors[heroCat] ?? themeAccent;
+    final bool isHeroDefault = heroCat == widget.defaultCategory;
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.only(top: 4, bottom: 100),
+      children: [
+        // 1. Hero Bento Card
+        InkWell(
+          onTap: () => _navigateToCategoryDetail(context, heroCat, heroColor),
+          onLongPress: () => _showCategoryOptionsSheet(context, heroCat),
+          borderRadius: BorderRadius.circular(22),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  heroColor.withOpacity(isDark ? 0.22 : 0.12),
+                  theme.cardBg,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: isHeroDefault ? Colors.amber.withOpacity(0.5) : heroColor.withOpacity(0.35),
+                width: 1.4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: heroColor.withOpacity(isDark ? 0.12 : 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: heroColor.withOpacity(isDark ? 0.25 : 0.16),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: heroColor.withOpacity(0.4)),
+                      ),
+                      child: Center(
+                        child: Icon(_getCategoryIcon(heroCat), color: heroColor, size: 24),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  heroCat,
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 17 * widget.uiScale,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                    letterSpacing: -0.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: Colors.amber.withOpacity(0.35),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.star_rounded, size: 11, color: Colors.amber),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      isHeroDefault ? '기본' : '대표',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.5 * widget.uiScale,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.amber,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '총 $heroCount개 기록',
+                            style: GoogleFonts.inter(
+                              color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                              fontSize: 12.5 * widget.uiScale,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _showCategoryOptionsSheet(context, heroCat),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.settings_outlined,
+                          color: isDark ? Colors.white70 : const Color(0xFF475569),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (heroTotal > 0) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'TODO 진행률 ($heroDoneCount/$heroTotal 완료)',
+                        style: GoogleFonts.inter(
+                          fontSize: 11 * widget.uiScale,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        '${(heroDoneRate * 100).toInt()}%',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 12 * widget.uiScale,
+                          fontWeight: FontWeight.w800,
+                          color: heroColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: heroDoneRate,
+                      backgroundColor: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06),
+                      valueColor: AlwaysStoppedAnimation<Color>(heroColor),
+                      minHeight: 5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        // 2. Sub Bento Tiles Grid
+        if (subCategories.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.15,
+            ),
+            itemCount: subCategories.length,
+            itemBuilder: (context, index) {
+              final cat = subCategories[index];
+              final catEntries = currentEntries.where((e) => e.category == cat).toList();
+              final count = catEntries.length;
+              final todoCount = catEntries.where((e) => e.status == 'todo').length;
+              final doneCount = catEntries.where((e) => e.status == 'done').length;
+              final totalTasks = todoCount + doneCount;
+              final color = widget.categoryColors[cat] ?? Colors.grey;
+
+              return InkWell(
+                onTap: () => _navigateToCategoryDetail(context, cat, color),
+                onLongPress: () => _showCategoryOptionsSheet(context, cat),
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.cardBg,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark ? Colors.black.withOpacity(0.18) : Colors.black.withOpacity(0.03),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(isDark ? 0.22 : 0.14),
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                            child: Center(
+                              child: Icon(_getCategoryIcon(cat), color: color, size: 18),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _showCategoryOptionsSheet(context, cat),
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.settings_outlined,
+                                size: 17,
+                                color: isDark ? Colors.white70 : const Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cat,
+                            style: GoogleFonts.inter(
+                              fontSize: 14 * widget.uiScale,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Text(
+                                '$count개',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11 * widget.uiScale,
+                                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              if (todoCount > 0) ...[
+                                const SizedBox(width: 5),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: color.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'TODO $todoCount',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 9 * widget.uiScale,
+                                      fontWeight: FontWeight.w700,
+                                      color: color,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (totalTasks > 0) ...[
+                            const SizedBox(height: 5),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: LinearProgressIndicator(
+                                value: doneCount / totalTasks,
+                                backgroundColor: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06),
+                                valueColor: AlwaysStoppedAnimation<Color>(color),
+                                minHeight: 2.5,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeController.instance.currentTheme;
+    final isAppDark = theme.isDark;
+    final themeAccent = (!isAppDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Categories',
-                style: GoogleFonts.inter(
-                  fontSize: 28 * uiScale,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '카테고리',
+                        style: GoogleFonts.inter(
+                          fontSize: 18 * widget.uiScale,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: isAppDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '주제별로 모아보는 나만의 순간들',
+                        style: GoogleFonts.inter(
+                          color: isAppDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
+                          fontSize: 12.5 * widget.uiScale,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => _showReorderAndDefaultSheet(context),
+                        tooltip: '카테고리 순서 및 기본 설정',
+                        icon: const Icon(Icons.tune_rounded, size: 20),
+                        color: isAppDark ? Colors.white70 : const Color(0xFF475569),
+                        style: IconButton.styleFrom(
+                          backgroundColor: isAppDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+                          padding: const EdgeInsets.all(10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          showAddCategoryModal(
+                            context,
+                            onAddCategory: widget.onAddCategory,
+                          );
+                        },
+                        tooltip: '새 카테고리 추가',
+                        icon: const Icon(Icons.add_rounded, size: 22),
+                        color: themeAccent.computeLuminance() > 0.6 ? Colors.black : Colors.white,
+                        style: IconButton.styleFrom(
+                          backgroundColor: themeAccent,
+                          padding: const EdgeInsets.all(10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Browse your moments by type',
-                style: GoogleFonts.inter(
-                  color: Colors.white.withOpacity(0.4),
-                  fontSize: 15 * uiScale,
-                ),
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 14),
+
+              // Categories Display (Bento Dashboard)
               Expanded(
                 child: ValueListenableBuilder<List<TimestampEntry>>(
-                  valueListenable: entriesNotifier,
+                  valueListenable: widget.entriesNotifier,
                   builder: (context, currentEntries, _) {
-                    return GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                            childAspectRatio: 0.9,
-                          ),
-                      itemCount: categories.length,
-                      itemBuilder: (context, index) {
-                        final cat = categories[index];
-                        final count = currentEntries
-                            .where((e) => e.category == cat)
-                            .length;
-                        final color = categoryColors[cat] ?? Colors.grey;
-
-                        return InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CategoryDetailView(
-                                  category: cat,
-                                  entriesNotifier: entriesNotifier,
-                                  categoryColor: color,
-                                  onDelete: onDelete,
-                                  onToggle: onToggle,
-                                  onClearCategory: onClearCategory,
-                                  uiScale: uiScale,
-                                ),
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(28),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF161922),
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(color: color.withOpacity(0.1)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: color.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: Icon(
-                                        _categoryIcons[cat] ??
-                                            Icons.label_outline,
-                                        color: color,
-                                        size: 24,
-                                      ),
-                                    ),
-                                    if (cat != 'General')
-                                      IconButton(
-                                        onPressed: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              backgroundColor:
-                                                  const Color(0xFF161922),
-                                              title: Text(
-                                                'Delete Category?',
-                                                style: GoogleFonts.inter(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              content: Text(
-                                                'This will delete "$cat" and ALL associated entries. This cannot be undone.',
-                                                style: GoogleFonts.inter(),
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(context),
-                                                  child: Text(
-                                                    'CANCEL',
-                                                    style: GoogleFonts.inter(
-                                                      color: Colors.white
-                                                          .withOpacity(0.5),
-                                                    ),
-                                                  ),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () {
-                                                    onDeleteCategory(cat);
-                                                    Navigator.pop(context);
-                                                  },
-                                                  child: Text(
-                                                    'DELETE',
-                                                    style: GoogleFonts.inter(
-                                                      color: Colors.red,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                        icon: Icon(
-                                          Icons.delete_outline_rounded,
-                                          size: 20,
-                                          color: Colors.white.withOpacity(0.2),
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                      ),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      cat,
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 18 * uiScale,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '$count ${count == 1 ? 'entry' : 'entries'}',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white.withOpacity(0.4),
-                                        fontSize: 13 * uiScale,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    );
+                    return _buildBentoView(context, currentEntries, theme, themeAccent);
                   },
                 ),
               ),
@@ -2450,7 +7703,12 @@ class CategoryDetailView extends StatefulWidget {
   final Function(String) onDelete;
   final Function(String) onToggle;
   final Function(String) onClearCategory;
+  final Function(TimestampEntry)? onUpdateEntry;
+  final List<String>? categories;
+  final Map<String, Color>? categoryColors;
   final double uiScale;
+  final Function(String, Color)? onUpdateCategoryColor;
+  final bool Function(String, String)? onRenameCategory;
 
   const CategoryDetailView({
     super.key,
@@ -2460,7 +7718,12 @@ class CategoryDetailView extends StatefulWidget {
     required this.onDelete,
     required this.onToggle,
     required this.onClearCategory,
+    this.onUpdateEntry,
+    this.categories,
+    this.categoryColors,
     required this.uiScale,
+    this.onUpdateCategoryColor,
+    this.onRenameCategory,
   });
 
   @override
@@ -2470,10 +7733,15 @@ class CategoryDetailView extends StatefulWidget {
 class _CategoryDetailViewState extends State<CategoryDetailView> {
   late Timer _timer;
   bool _showOnlyTodo = false;
+  late String _currentCategory;
+
+  Color get _effectiveColor =>
+      widget.categoryColors?[_currentCategory] ?? widget.categoryColor;
 
   @override
   void initState() {
     super.initState();
+    _currentCategory = widget.category;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() {});
     });
@@ -2492,59 +7760,19 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, size: 20, color: appText),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          widget.category,
+          _currentCategory,
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w800,
             fontSize: 18 * widget.uiScale,
+            color: appText,
           ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  backgroundColor: const Color(0xFF161922),
-                  title: Text(
-                    'Clear Category?',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-                  ),
-                  content: Text(
-                    'Delete all records in ${widget.category}?',
-                    style: GoogleFonts.inter(),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        'CANCEL',
-                        style: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.5),
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        widget.onClearCategory(widget.category);
-                        Navigator.pop(context);
-                      },
-                      child: Text(
-                        'CLEAR ALL',
-                        style: GoogleFonts.inter(color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-            icon: const Icon(Icons.delete_sweep_outlined, color: Colors.red),
-            tooltip: 'Clear All in Category',
-          ),
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
             child: IconButton(
@@ -2554,11 +7782,11 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                     ? Icons.filter_list_rounded
                     : Icons.filter_list_off_rounded,
                 color: _showOnlyTodo
-                    ? widget.categoryColor
-                    : Colors.white.withOpacity(0.4),
+                    ? _effectiveColor
+                    : appTextTertiary,
                 size: 20,
               ),
-              tooltip: 'Filter TODO Only',
+              tooltip: _showOnlyTodo ? '전체 보기' : 'TODO 모아보기',
             ),
           ),
         ],
@@ -2567,7 +7795,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
         valueListenable: widget.entriesNotifier,
         builder: (context, currentEntries, _) {
           final categoryEntries = currentEntries
-              .where((e) => e.category == widget.category)
+              .where((e) => e.category == _currentCategory)
               .toList();
 
           final filteredEntries = _showOnlyTodo
@@ -2582,14 +7810,14 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                   Icon(
                     Icons.history_toggle_off_rounded,
                     size: 48,
-                    color: Colors.white.withOpacity(0.1),
+                    color: appTextTertiary.withOpacity(0.5),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No entries in this category',
+                    '이 카테고리에 기록이 없습니다',
                     style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.3),
-                      fontSize: 16,
+                      color: appTextTertiary,
+                      fontSize: 15,
                     ),
                   ),
                 ],
@@ -2605,14 +7833,14 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                   Icon(
                     Icons.filter_list_off_rounded,
                     size: 48,
-                    color: Colors.white.withOpacity(0.1),
+                    color: appTextTertiary.withOpacity(0.5),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No TODOs in this category',
+                    '이 카테고리에 진행 중인 TODO가 없습니다',
                     style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.3),
-                      fontSize: 16,
+                      color: appTextTertiary,
+                      fontSize: 15,
                     ),
                   ),
                 ],
@@ -2627,9 +7855,14 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
               final entry = filteredEntries[index];
               return TimestampListItem(
                 entry: entry,
-                categoryColor: widget.categoryColor,
+                categoryColor: _effectiveColor,
                 onDelete: () => widget.onDelete(entry.id),
                 onStatusToggle: () => widget.onToggle(entry.id),
+                onUpdate: widget.onUpdateEntry,
+                categories: widget.categories,
+                getCategoryColor: (cat) =>
+                    widget.categoryColors?[cat] ??
+                    (cat == _currentCategory ? _effectiveColor : widget.categoryColor),
                 uiScale: widget.uiScale,
               );
             },
@@ -2643,11 +7876,13 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
 class InsightView extends StatefulWidget {
   final ValueNotifier<List<TimestampEntry>> entriesNotifier;
   final double uiScale;
+  final Map<String, Color>? categoryColors;
 
   const InsightView({
     super.key, 
     required this.entriesNotifier,
     required this.uiScale,
+    this.categoryColors,
   });
 
   @override
@@ -2655,78 +7890,428 @@ class InsightView extends StatefulWidget {
 }
 
 class _InsightViewState extends State<InsightView> {
-  String _selectedFilter = 'All Time';
-  final List<String> _filters = ['All Time', 'Day', 'Week', 'Month', 'Year'];
-  DateTime _referenceDate = DateTime.now();
-  String _selectedCalendarCategory = 'All';
+  String _whereFilter = '전체';
+  final List<String> _whereFilters = ['전체', '일간', '주간', '월간', '연간'];
+  DateTime _whereReferenceDate = DateTime.now();
+  String _selectedGlobalCategory = 'All';
+  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime? _selectedCalendarDay;
-  final List<String> _sectionOrder = [
-    'ACTIVITY CALENDAR',
-    'WHERE MY TIME GOES',
+  DateTime _selectedWeekStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)
+      .subtract(Duration(days: DateTime.now().weekday - 1));
+  DateTime _matrixMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+
+  static const List<Map<String, dynamic>> kDefaultCards = [
+    {
+      'id': 'weekly_timetable',
+      'title': '주간 라이프 타임테이블',
+      'subtitle': '가로(요일) × 세로(시간대)별 활동 매트릭스',
+      'icon': Icons.table_chart_rounded,
+    },
+    {
+      'id': 'monthly_time_matrix',
+      'title': '월간 타임 매트릭스',
+      'subtitle': '세로(날짜 1~31일) × 가로(24시간) 활동 타임라인',
+      'icon': Icons.calendar_view_month_rounded,
+    },
+    {
+      'id': 'where_my_time_goes',
+      'title': '카테고리별 시간 분석',
+      'subtitle': '카테고리별 소요 시간 및 점유 비율',
+      'icon': Icons.pie_chart_outline_rounded,
+    },
+    {
+      'id': 'activity_distribution_24h',
+      'title': '24시간 활동 패턴',
+      'subtitle': '시간대별(새벽/오전/오후/저녁) 활동 분포',
+      'icon': Icons.schedule_rounded,
+    },
+    {
+      'id': 'weekday_pattern',
+      'title': '요일별 집중도',
+      'subtitle': '월~일 활동 분포 및 주중/주말 패턴',
+      'icon': Icons.calendar_view_week_rounded,
+    },
+    {
+      'id': 'productivity_summary',
+      'title': '생산성 & TODO 요약',
+      'subtitle': 'TODO 완료율 및 평균 소요 시간',
+      'icon': Icons.task_alt_rounded,
+    },
+    {
+      'id': 'top_tasks',
+      'title': '최다 소요 작업 Top 5',
+      'subtitle': '가장 많은 시간을 투자한 활동 랭킹',
+      'icon': Icons.leaderboard_outlined,
+    },
+    {
+      'id': 'activity_calendar',
+      'title': '활동 캘린더',
+      'subtitle': '월별 기록 밀도 및 날짜별 상세 내역',
+      'icon': Icons.calendar_month_rounded,
+    },
   ];
 
-  void _previousPeriod() {
-    setState(() {
-      if (_selectedFilter == 'Day') {
-        _referenceDate = _referenceDate.subtract(const Duration(days: 1));
-      } else if (_selectedFilter == 'Week') {
-        _referenceDate = _referenceDate.subtract(const Duration(days: 7));
-      } else if (_selectedFilter == 'Month') {
-        _referenceDate = DateTime(
-          _referenceDate.year,
-          _referenceDate.month - 1,
-          _referenceDate.day,
+  List<String> _cardOrder = [
+    'weekly_timetable',
+    'monthly_time_matrix',
+    'where_my_time_goes',
+    'activity_distribution_24h',
+    'weekday_pattern',
+    'productivity_summary',
+    'top_tasks',
+    'activity_calendar',
+  ];
+
+  Map<String, bool> _cardVisibility = {
+    'weekly_timetable': true,
+    'monthly_time_matrix': true,
+    'where_my_time_goes': true,
+    'activity_distribution_24h': true,
+    'weekday_pattern': true,
+    'productivity_summary': true,
+    'top_tasks': true,
+    'activity_calendar': true,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCardSettings();
+  }
+
+  Future<void> _loadCardSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final orderJson = prefs.getString('chronos_insight_card_order');
+    final visJson = prefs.getString('chronos_insight_card_visibility');
+    if (orderJson != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(orderJson);
+        final List<String> loadedOrder = decoded.map((e) => e.toString()).toList();
+        for (final card in kDefaultCards) {
+          if (!loadedOrder.contains(card['id'])) {
+            loadedOrder.add(card['id'] as String);
+          }
+        }
+        setState(() {
+          _cardOrder = loadedOrder;
+        });
+      } catch (_) {}
+    }
+    if (visJson != null) {
+      try {
+        final Map<String, dynamic> decoded = jsonDecode(visJson);
+        final Map<String, bool> loadedVis = decoded.map((k, v) => MapEntry(k, v as bool));
+        for (final card in kDefaultCards) {
+          final id = card['id'] as String;
+          if (!loadedVis.containsKey(id)) {
+            loadedVis[id] = true;
+          }
+        }
+        setState(() {
+          _cardVisibility = loadedVis;
+        });
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _saveCardSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('chronos_insight_card_order', jsonEncode(_cardOrder));
+    await prefs.setString('chronos_insight_card_visibility', jsonEncode(_cardVisibility));
+  }
+
+  void _showCardCustomizationSheet(BuildContext context) {
+    final List<String> currentOrder = List<String>.from(_cardOrder);
+    final Map<String, bool> currentVis = Map<String, bool>.from(_cardVisibility);
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              ),
+              decoration: BoxDecoration(
+                color: appCardBg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onVerticalDragUpdate: (details) {
+                          if (details.primaryDelta! > 7) {
+                            Navigator.pop(context);
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Center(
+                            child: Container(
+                              width: 36,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '통계 카드 편집',
+                                style: GoogleFonts.inter(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                  color: appText,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '카드를 켜거나 끄고, 드래그하여 순서를 변경하세요',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  color: appTextTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            color: appTextSecondary,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Flexible(
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            canvasColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                          ),
+                          child: ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: currentOrder.length,
+                            onReorder: (oldIndex, newIndex) {
+                              if (oldIndex < newIndex) newIndex -= 1;
+                              final item = currentOrder.removeAt(oldIndex);
+                              currentOrder.insert(newIndex, item);
+                              setSheetState(() {});
+                            },
+                            itemBuilder: (context, index) {
+                              final cardId = currentOrder[index];
+                              final cardMeta = kDefaultCards.firstWhere(
+                                (c) => c['id'] == cardId,
+                                orElse: () => {
+                                  'id': cardId,
+                                  'title': cardId,
+                                  'subtitle': '',
+                                  'icon': Icons.insights_rounded,
+                                },
+                              );
+                              final bool isVisible = currentVis[cardId] ?? true;
+
+                              return Container(
+                                key: ValueKey('card_$cardId'),
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: appSubtleBg,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isVisible ? themeAccent.withOpacity(0.4) : appBorder,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      cardMeta['icon'] as IconData,
+                                      size: 20,
+                                      color: isVisible ? themeAccent : appTextTertiary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            cardMeta['title'] as String,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: isVisible ? appText : appTextTertiary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            cardMeta['subtitle'] as String,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 10.5,
+                                              color: appTextTertiary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Switch(
+                                      value: isVisible,
+                                      activeColor: themeAccent,
+                                      onChanged: (val) {
+                                        currentVis[cardId] = val;
+                                        setSheetState(() {});
+                                      },
+                                    ),
+                                    const SizedBox(width: 6),
+                                    ReorderableDragStartListener(
+                                      index: index,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        child: Icon(
+                                          Icons.drag_handle_rounded,
+                                          size: 20,
+                                          color: appTextTertiary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _cardOrder = currentOrder;
+                              _cardVisibility = currentVis;
+                            });
+                            _saveCardSettings();
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: themeAccent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            '설정 완료',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         );
-      } else if (_selectedFilter == 'Year') {
-        _referenceDate = DateTime(
-          _referenceDate.year - 1,
-          _referenceDate.month,
-          _referenceDate.day,
+      },
+    );
+  }
+
+  void _previousWherePeriod() {
+    setState(() {
+      if (_whereFilter == '일간') {
+        _whereReferenceDate = _whereReferenceDate.subtract(const Duration(days: 1));
+      } else if (_whereFilter == '주간') {
+        _whereReferenceDate = _whereReferenceDate.subtract(const Duration(days: 7));
+      } else if (_whereFilter == '월간') {
+        _whereReferenceDate = DateTime(
+          _whereReferenceDate.year,
+          _whereReferenceDate.month - 1,
+          _whereReferenceDate.day,
+        );
+      } else if (_whereFilter == '연간') {
+        _whereReferenceDate = DateTime(
+          _whereReferenceDate.year - 1,
+          _whereReferenceDate.month,
+          _whereReferenceDate.day,
         );
       }
-      _selectedCalendarDay = null;
     });
   }
 
-  void _nextPeriod() {
+  void _nextWherePeriod() {
     setState(() {
-      if (_selectedFilter == 'Day') {
-        _referenceDate = _referenceDate.add(const Duration(days: 1));
-      } else if (_selectedFilter == 'Week') {
-        _referenceDate = _referenceDate.add(const Duration(days: 7));
-      } else if (_selectedFilter == 'Month') {
-        _referenceDate = DateTime(
-          _referenceDate.year,
-          _referenceDate.month + 1,
-          _referenceDate.day,
+      if (_whereFilter == '일간') {
+        _whereReferenceDate = _whereReferenceDate.add(const Duration(days: 1));
+      } else if (_whereFilter == '주간') {
+        _whereReferenceDate = _whereReferenceDate.add(const Duration(days: 7));
+      } else if (_whereFilter == '월간') {
+        _whereReferenceDate = DateTime(
+          _whereReferenceDate.year,
+          _whereReferenceDate.month + 1,
+          _whereReferenceDate.day,
         );
-      } else if (_selectedFilter == 'Year') {
-        _referenceDate = DateTime(
-          _referenceDate.year + 1,
-          _referenceDate.month,
-          _referenceDate.day,
+      } else if (_whereFilter == '연간') {
+        _whereReferenceDate = DateTime(
+          _whereReferenceDate.year + 1,
+          _whereReferenceDate.month,
+          _whereReferenceDate.day,
         );
       }
-      _selectedCalendarDay = null;
     });
   }
 
-  void _previousMonth() {
+  void _previousCalendarMonth() {
     setState(() {
-      _referenceDate = DateTime(
-        _referenceDate.year,
-        _referenceDate.month - 1,
+      _calendarMonth = DateTime(
+        _calendarMonth.year,
+        _calendarMonth.month - 1,
         1,
       );
       _selectedCalendarDay = null;
     });
   }
 
-  void _nextMonth() {
+  void _nextCalendarMonth() {
     setState(() {
-      _referenceDate = DateTime(
-        _referenceDate.year,
-        _referenceDate.month + 1,
+      _calendarMonth = DateTime(
+        _calendarMonth.year,
+        _calendarMonth.month + 1,
         1,
       );
       _selectedCalendarDay = null;
@@ -2734,38 +8319,45 @@ class _InsightViewState extends State<InsightView> {
   }
 
   void _showMonthPicker() {
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+
     showDialog(
       context: context,
       builder: (context) {
-        DateTime tempDate = _referenceDate;
+        DateTime tempDate = _calendarMonth;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: const Color(0xFF161922),
+              backgroundColor: appCardBg,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: appBorder),
               ),
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Select Month',
+                    '월 선택',
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: appText,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   DropdownButton<int>(
                     value: tempDate.year,
-                    dropdownColor: const Color(0xFF161922),
+                    dropdownColor: appCardBg,
                     style: GoogleFonts.jetBrainsMono(
-                      color: Colors.white,
+                      color: appText,
                       fontSize: 16,
+                      fontWeight: FontWeight.w700,
                     ),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.keyboard_arrow_down,
-                      color: Colors.white,
+                      color: appTextSecondary,
                     ),
                     underline: Container(),
                     items: List.generate(21, (i) => 2020 + i)
@@ -2777,10 +8369,11 @@ class _InsightViewState extends State<InsightView> {
                         )
                         .toList(),
                     onChanged: (y) {
-                      if (y != null)
+                      if (y != null) {
                         setDialogState(
                           () => tempDate = DateTime(y, tempDate.month),
                         );
+                      }
                     },
                   ),
                 ],
@@ -2799,12 +8392,12 @@ class _InsightViewState extends State<InsightView> {
                   itemBuilder: (context, index) {
                     final month = index + 1;
                     final isSelected =
-                        _referenceDate.year == tempDate.year &&
-                        _referenceDate.month == month;
+                        _calendarMonth.year == tempDate.year &&
+                        _calendarMonth.month == month;
                     return InkWell(
                       onTap: () {
                         setState(() {
-                          _referenceDate = DateTime(tempDate.year, month, 1);
+                          _calendarMonth = DateTime(tempDate.year, month, 1);
                           _selectedCalendarDay = null;
                         });
                         Navigator.pop(context);
@@ -2813,22 +8406,22 @@ class _InsightViewState extends State<InsightView> {
                       child: Container(
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFF6366F1)
-                              : Colors.white.withOpacity(0.05),
+                              ? themeAccent
+                              : appSubtleBg,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isSelected
-                                ? const Color(0xFF6366F1)
-                                : Colors.white.withOpacity(0.1),
+                                ? themeAccent
+                                : appBorder,
                           ),
                         ),
                         alignment: Alignment.center,
                         child: Text(
-                          DateFormat('MMM').format(DateTime(2024, month)),
+                          '$month월',
                           style: GoogleFonts.inter(
                             color: isSelected
                                 ? Colors.white
-                                : Colors.white.withOpacity(0.7),
+                                : appTextSecondary,
                             fontWeight: isSelected
                                 ? FontWeight.w700
                                 : FontWeight.w500,
@@ -2847,93 +8440,2596 @@ class _InsightViewState extends State<InsightView> {
     );
   }
 
-  String _getPeriodLabel() {
-    if (_selectedFilter == 'Day') {
-      return DateFormat('MMM d, yyyy').format(_referenceDate);
-    } else if (_selectedFilter == 'Week') {
-      final startOfWeek = _referenceDate.subtract(
-        Duration(days: _referenceDate.weekday - 1),
-      );
-      final endOfWeek = startOfWeek.add(const Duration(days: 6));
-      final startStr = DateFormat('MMM d').format(startOfWeek);
-      final endStr = DateFormat('MMM d, yyyy').format(endOfWeek);
-      return '$startStr - $endStr';
-    } else if (_selectedFilter == 'Month') {
-      return DateFormat('MMMM yyyy').format(_referenceDate);
-    } else if (_selectedFilter == 'Year') {
-      return DateFormat('yyyy').format(_referenceDate);
+  String _formatDateKorean(DateTime date, {bool includeWeekday = false}) {
+    if (includeWeekday) {
+      const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+      final w = weekdays[(date.weekday - 1).clamp(0, 6)];
+      return '${date.year}년 ${date.month}월 ${date.day}일 ($w)';
     }
-    return '';
+    return '${date.year}년 ${date.month}월';
   }
 
-  List<TimestampEntry> _getFilteredEntries(List<TimestampEntry> allEntries) {
-    if (_selectedFilter == 'All Time') return allEntries;
+  String _getWherePeriodLabel() {
+    if (_whereFilter == '일간') {
+      return _formatDateKorean(_whereReferenceDate, includeWeekday: true);
+    } else if (_whereFilter == '주간') {
+      final refDateOnly = DateTime(_whereReferenceDate.year, _whereReferenceDate.month, _whereReferenceDate.day);
+      final startOfWeek = refDateOnly.subtract(Duration(days: _whereReferenceDate.weekday - 1));
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+      return '${startOfWeek.month}/${startOfWeek.day} ~ ${endOfWeek.month}/${endOfWeek.day}';
+    } else if (_whereFilter == '월간') {
+      return _formatDateKorean(_whereReferenceDate);
+    } else if (_whereFilter == '연간') {
+      return '${_whereReferenceDate.year}년';
+    }
+    return '전체 기간';
+  }
 
-    return allEntries.where((entry) {
-      if (_selectedFilter == 'Day') {
-        return entry.timestamp.year == _referenceDate.year &&
-            entry.timestamp.month == _referenceDate.month &&
-            entry.timestamp.day == _referenceDate.day;
-      } else if (_selectedFilter == 'Week') {
-        final startOfWeek = _referenceDate.subtract(
-          Duration(days: _referenceDate.weekday - 1),
-        );
-        final endOfWeek = startOfWeek.add(
-          const Duration(days: 6, hours: 23, minutes: 59, seconds: 59),
-        );
-        return entry.timestamp.isAfter(
-              startOfWeek.subtract(const Duration(seconds: 1)),
-            ) &&
-            entry.timestamp.isBefore(endOfWeek.add(const Duration(seconds: 1)));
-      } else if (_selectedFilter == 'Month') {
-        return entry.timestamp.year == _referenceDate.year &&
-            entry.timestamp.month == _referenceDate.month;
-      } else if (_selectedFilter == 'Year') {
-        return entry.timestamp.year == _referenceDate.year;
+  List<TimestampEntry> _getWhereFilteredEntries(List<TimestampEntry> allEntries) {
+    var entries = allEntries;
+    if (_selectedGlobalCategory != 'All') {
+      entries = entries.where((e) => e.category == _selectedGlobalCategory).toList();
+    }
+
+    if (_whereFilter == '전체') return entries;
+
+    final ref = _whereReferenceDate;
+    final refDateOnly = DateTime(ref.year, ref.month, ref.day);
+
+    return entries.where((entry) {
+      final entryDate = DateTime(entry.timestamp.year, entry.timestamp.month, entry.timestamp.day);
+      if (_whereFilter == '일간') {
+        return entryDate == refDateOnly;
+      } else if (_whereFilter == '주간') {
+        // 월요일 00:00:00.000 정규화 (오늘 이전 기록도 주간 범위에 완벽 포함!)
+        final startOfWeek = refDateOnly.subtract(Duration(days: ref.weekday - 1));
+        // 다음 주 월요일 00:00:00.000 (일요일 23:59:59.999까지)
+        final endOfWeek = startOfWeek.add(const Duration(days: 7));
+        return (entry.timestamp.isAfter(startOfWeek) || entry.timestamp.isAtSameMomentAs(startOfWeek)) &&
+            entry.timestamp.isBefore(endOfWeek);
+      } else if (_whereFilter == '월간') {
+        return entry.timestamp.year == ref.year && entry.timestamp.month == ref.month;
+      } else if (_whereFilter == '연간') {
+        return entry.timestamp.year == ref.year;
       }
       return true;
     }).toList();
   }
 
+  Widget _buildGlobalCategoryFilter(List<TimestampEntry> entries) {
+    final categoryList = <String>['All'];
+    if (widget.categoryColors != null) {
+      categoryList.addAll(widget.categoryColors!.keys);
+    }
+    for (final e in entries) {
+      if (!categoryList.contains(e.category)) {
+        categoryList.add(e.category);
+      }
+    }
+
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: categoryList.map((cat) {
+          final isSelected = _selectedGlobalCategory == cat;
+          final color = cat == 'All' ? themeAccent : _getCategoryColor(cat);
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedGlobalCategory = cat;
+                  _selectedCalendarDay = null;
+                });
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? color.withOpacity(isAppDark ? 0.22 : 0.15)
+                      : (isAppDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.04)),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? color : appBorder,
+                    width: isSelected ? 1.5 : 1.0,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: color.withOpacity(0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      cat == 'All' ? '전체' : cat,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? (isAppDark ? Colors.white : color) : (isAppDark ? Colors.white.withOpacity(0.6) : const Color(0xFF475569)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  String _formatMinutes(int minutes) {
+    if (minutes <= 0) return '0분';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h > 0 && m > 0) return '${h}시간 ${m}분';
+    if (h > 0) return '${h}시간';
+    return '${m}분';
+  }
+
   Widget _buildSectionCard({
     required String title,
-    Widget? selector,
-    required Widget content,
     String? subtitle,
+    Widget? selector,
+    Widget? content,
+    Widget? child,
+    IconData? icon,
+    Widget? headerTrailing,
   }) {
+    final effectiveContent = content ?? child ?? const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF161922),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        color: appCardBg,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: appBorder),
+        boxShadow: [
+          BoxShadow(
+            color: isAppDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: isAppDark ? Colors.white.withOpacity(0.5) : const Color(0xFF64748B)),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: appText,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              if (headerTrailing != null) headerTrailing,
+            ],
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: GoogleFonts.inter(
+                color: appTextTertiary,
+                fontSize: 12,
+              ),
+            ),
+          ],
+          if (selector != null) ...[
+            const SizedBox(height: 16),
+            selector,
+          ],
+          const SizedBox(height: 18),
+          effectiveContent,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWhereMyTimeGoesCard(
+    List<TimestampEntry> filteredEntries,
+    int totalCount,
+    Map<String, Map<String, dynamic>> categoryStats,
+  ) {
+    int totalTimeMinutes = 0;
+    if (categoryStats.isNotEmpty) {
+      totalTimeMinutes = categoryStats.values.first['totalDurationMinutes'] as int? ?? 0;
+    }
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+    final accentColor = _selectedGlobalCategory == 'All'
+        ? themeAccent
+        : _getCategoryColor(_selectedGlobalCategory);
+
+    return _buildSectionCard(
+      title: '시간 사용 통계',
+      subtitle: '카테고리별 소요 시간과 점유율을 분석합니다',
+      icon: Icons.pie_chart_outline_rounded,
+      selector: Column(
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _whereFilters.map((filter) {
+                final isSelected = _whereFilter == filter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: Text(filter),
+                    selected: isSelected,
+                    selectedColor: accentColor,
+                    backgroundColor: appSubtleBg,
+                    labelStyle: GoogleFonts.inter(
+                      color: isSelected
+                          ? (accentColor.computeLuminance() > 0.5 ? Colors.black : Colors.white)
+                          : appTextSecondary,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                    onSelected: (selected) {
+                      if (selected) setState(() => _whereFilter = filter);
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isSelected ? accentColor : appBorder,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          if (_whereFilter != '전체') ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  onPressed: _previousWherePeriod,
+                  icon: Icon(
+                    Icons.chevron_left_rounded,
+                    color: appTextSecondary,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: appSubtleBg,
+                  ),
+                ),
+                Flexible(
+                  child: GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _whereReferenceDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                        builder: (context, child) => Theme(
+                          data: (isAppDark ? ThemeData.dark() : ThemeData.light()).copyWith(
+                            colorScheme: isAppDark
+                                ? ColorScheme.dark(
+                                    primary: accentColor,
+                                    surface: appCardBg,
+                                  )
+                                : ColorScheme.light(
+                                    primary: accentColor,
+                                    surface: appCardBg,
+                                  ),
+                          ),
+                          child: child!,
+                        ),
+                      );
+                      if (picked != null) setState(() => _whereReferenceDate = picked);
+                    },
+                    child: Text(
+                      _getWherePeriodLabel(),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: appText,
+                        decoration: TextDecoration.underline,
+                        decorationColor: isAppDark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.3),
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _nextWherePeriod,
+                  icon: Icon(
+                    Icons.chevron_right_rounded,
+                    color: appTextSecondary,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: appSubtleBg,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title,
+            totalTimeMinutes > 0
+                ? '총 ${_formatMinutes(totalTimeMinutes)} 소요 ($totalCount건의 기록)'
+                : '총 $totalCount건의 기록',
             style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: Colors.white.withOpacity(0.3),
-              letterSpacing: 1.2,
+              color: appTextSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 8),
+          if (categoryStats.isNotEmpty) ...[
+            const SizedBox(height: 20),
             Text(
-              subtitle,
+              '카테고리 점유율',
               style: GoogleFonts.inter(
-                color: Colors.white.withOpacity(0.2),
-                fontSize: 12,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: appTextTertiary,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              height: 12,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: appSubtleBg,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: appBorder),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Row(
+                children: categoryStats.entries.map((stat) {
+                  final double pct = (stat.value['percentage'] as num).toDouble();
+                  final catColor = _getCategoryColor(stat.key);
+                  return Expanded(
+                    flex: (pct * 1000).toInt().clamp(1, 1000),
+                    child: Container(color: catColor),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ...categoryStats.entries.map((stat) {
+              final catColor = _getCategoryColor(stat.key);
+              return _buildStatRow(
+                stat.key,
+                stat.value,
+                totalCount,
+                color: catColor,
+              );
+            }),
+          ] else ...[
+            const SizedBox(height: 24),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  '선택한 기간에 기록된 데이터가 없습니다.',
+                  style: GoogleFonts.inter(color: appTextTertiary, fontSize: 13),
+                ),
               ),
             ),
           ],
-          if (selector != null) ...[const SizedBox(height: 20), selector],
-          const SizedBox(height: 24),
-          content,
+        ],
+      ),
+    );
+  }
+
+  Widget _build24HourDistributionCard(List<TimestampEntry> entries) {
+    if (entries.isEmpty) {
+      return _buildSectionCard(
+        title: '24시간 활동 패턴',
+        subtitle: '언제 가장 활발하게 활동하고 기록하는지 분석합니다',
+        icon: Icons.schedule_rounded,
+        content: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              '기록된 데이터가 없습니다.',
+              style: GoogleFonts.inter(color: appTextTertiary, fontSize: 13),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final hourCounts = List.filled(24, 0);
+    for (final e in entries) {
+      final hour = e.timestamp.hour.clamp(0, 23);
+      hourCounts[hour]++;
+    }
+
+    int maxHourCount = 0;
+    int peakHour = 0;
+    for (int i = 0; i < 24; i++) {
+      if (hourCounts[i] > maxHourCount) {
+        maxHourCount = hourCounts[i];
+        peakHour = i;
+      }
+    }
+
+    int nightCount = 0;
+    int morningCount = 0;
+    int afternoonCount = 0;
+    int eveningCount = 0;
+    for (int i = 0; i < 6; i++) nightCount += hourCounts[i];
+    for (int i = 6; i < 12; i++) morningCount += hourCounts[i];
+    for (int i = 12; i < 18; i++) afternoonCount += hourCounts[i];
+    for (int i = 18; i < 24; i++) eveningCount += hourCounts[i];
+
+    final total = entries.length;
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+    final chartColor = _selectedGlobalCategory == 'All'
+        ? themeAccent
+        : _getCategoryColor(_selectedGlobalCategory);
+
+    return _buildSectionCard(
+      title: '24시간 활동 패턴',
+      subtitle: '언제 가장 활발하게 활동하고 기록하는지 분석합니다',
+      icon: Icons.schedule_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: chartColor.withOpacity(isAppDark ? 0.12 : 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: chartColor.withOpacity(0.25)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.local_fire_department_rounded, size: 16, color: Color(0xFFF59E0B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    maxHourCount > 0
+                        ? '피크 타임: ${peakHour.toString().padLeft(2, '0')}:00 ~ ${(peakHour + 1).toString().padLeft(2, '0')}:00 ($maxHourCount건 기록)'
+                        : '기록된 활동 없음',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: appText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildSegmentPill('🌙 새벽', '00-06시', nightCount, total, const Color(0xFF8B5CF6)),
+              const SizedBox(width: 8),
+              _buildSegmentPill('🌅 오전', '06-12시', morningCount, total, const Color(0xFF06B6D4)),
+              const SizedBox(width: 8),
+              _buildSegmentPill('☀️ 오후', '12-18시', afternoonCount, total, const Color(0xFFF59E0B)),
+              const SizedBox(width: 8),
+              _buildSegmentPill('🌆 저녁', '18-24시', eveningCount, total, const Color(0xFF10B981)),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            '24시간 타임라인 (00:00 ~ 23:00)',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: appTextTertiary,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: 114,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            decoration: BoxDecoration(
+              color: appSubtleBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: appBorder),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(24, (h) {
+                final count = hourCounts[h];
+                final double factor = maxHourCount > 0 ? (count / maxHourCount) : 0.0;
+                final bool isPeak = count == maxHourCount && count > 0;
+
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          height: 14,
+                          child: Center(
+                            child: count > 0
+                                ? FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      '$count',
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 7.5,
+                                        color: isPeak ? chartColor : appTextSecondary,
+                                        fontWeight: isPeak ? FontWeight.w800 : FontWeight.w500,
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          height: (factor * 50).clamp(4.0, 50.0),
+                          decoration: BoxDecoration(
+                            color: count == 0
+                                ? (isAppDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05))
+                                : (isPeak
+                                    ? chartColor
+                                    : chartColor.withOpacity(0.4 + 0.5 * factor)),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          height: 14,
+                          child: Center(
+                            child: Text(
+                              h % 6 == 0 ? '$h' : '·',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 8,
+                                color: appTextTertiary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentPill(String title, String timeRange, int count, int total, Color accentColor) {
+    final pct = total > 0 ? ((count / total) * 100).toInt() : 0;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
+        decoration: BoxDecoration(
+          color: appSubtleBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accentColor.withOpacity(0.25)),
+        ),
+        child: Column(
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: appText,
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                timeRange,
+                style: GoogleFonts.inter(
+                  fontSize: 7.5,
+                  color: appTextTertiary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '$count건',
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: accentColor,
+                ),
+              ),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '$pct%',
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 8,
+                  color: appTextTertiary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeekdayPatternCard(List<TimestampEntry> entries) {
+    if (entries.isEmpty) {
+      return _buildSectionCard(
+        title: '요일별 활동 패턴',
+        subtitle: '요일별 활동 패턴 및 집중도',
+        icon: Icons.calendar_view_week_rounded,
+        content: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              '기록된 데이터가 없습니다.',
+              style: GoogleFonts.inter(color: appTextTertiary, fontSize: 13),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final dayCounts = List.filled(7, 0);
+    final dayMinutes = List.filled(7, 0);
+    final dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+
+    for (final e in entries) {
+      final dIndex = (e.timestamp.weekday - 1).clamp(0, 6);
+      dayCounts[dIndex]++;
+      int dur = e.computedDurationMinutes ?? 0;
+      if (dur <= 0 && e.status == 'done' && e.doneTimestamp != null) {
+        dur = e.doneTimestamp!.difference(e.timestamp).inMinutes;
+      }
+      dayMinutes[dIndex] += dur;
+    }
+
+    int maxDayCount = 0;
+    int bestDay = 0;
+    for (int i = 0; i < 7; i++) {
+      if (dayCounts[i] > maxDayCount) {
+        maxDayCount = dayCounts[i];
+        bestDay = i;
+      }
+    }
+
+    int weekdayCount = 0;
+    int weekendCount = 0;
+    for (int i = 0; i < 5; i++) weekdayCount += dayCounts[i];
+    for (int i = 5; i < 7; i++) weekendCount += dayCounts[i];
+    final total = entries.length;
+    final weekdayPct = total > 0 ? ((weekdayCount / total) * 100).toInt() : 0;
+    final weekendPct = total > 0 ? ((weekendCount / total) * 100).toInt() : 0;
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+    final chartColor = _selectedGlobalCategory == 'All'
+        ? const Color(0xFF10B981)
+        : _getCategoryColor(_selectedGlobalCategory);
+
+    return _buildSectionCard(
+      title: '요일별 활동 패턴',
+      subtitle: '요일별 활동 빈도와 주중/주말 생산성을 비교합니다',
+      icon: Icons.calendar_view_week_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: chartColor.withOpacity(isAppDark ? 0.12 : 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: chartColor.withOpacity(0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.star_rounded, size: 16, color: chartColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    maxDayCount > 0
+                        ? '가장 집중한 요일: ${dayNames[bestDay]}요일 (${dayCounts[bestDay]}건 / ${_formatMinutes(dayMinutes[bestDay])})'
+                        : '기록된 활동 없음',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: appText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(7, (i) {
+              final count = dayCounts[i];
+              final factor = maxDayCount > 0 ? (count / maxDayCount) : 0.0;
+              final isBest = i == bestDay && count > 0;
+              final isWeekend = i >= 5;
+
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$count',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 10,
+                          fontWeight: isBest ? FontWeight.w800 : FontWeight.w600,
+                          color: isBest ? chartColor : appTextSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        height: (factor * 70).clamp(6.0, 70.0),
+                        decoration: BoxDecoration(
+                          color: isBest
+                              ? chartColor
+                              : (count == 0
+                                  ? (isAppDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.04))
+                                  : (isWeekend
+                                      ? const Color(0xFFF59E0B).withOpacity(0.4 + 0.5 * factor)
+                                      : chartColor.withOpacity(0.4 + 0.5 * factor))),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        dayNames[i],
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: isBest ? FontWeight.w800 : FontWeight.w600,
+                          color: isBest
+                              ? chartColor
+                              : (isWeekend ? const Color(0xFFF59E0B) : appTextSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: appSubtleBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: appBorder),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '주중 (월~금) $weekdayCount건 ($weekdayPct%)',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: themeAccent,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '주말 (토~일) $weekendCount건 ($weekendPct%)',
+                        textAlign: TextAlign.end,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFF59E0B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: weekdayCount > 0 ? weekdayCount : 1,
+                        child: Container(height: 6, color: themeAccent),
+                      ),
+                      Expanded(
+                        flex: weekendCount > 0 ? weekendCount : 1,
+                        child: Container(height: 6, color: const Color(0xFFF59E0B)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductivitySummaryCard(List<TimestampEntry> entries) {
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+    final chartColor = _selectedGlobalCategory == 'All'
+        ? const Color(0xFF10B981)
+        : _getCategoryColor(_selectedGlobalCategory);
+    final todos = entries.where((e) => e.status == 'todo' || e.status == 'done').toList();
+    final dones = entries.where((e) => e.status == 'done').toList();
+    final pending = entries.where((e) => e.status == 'todo').toList();
+
+    int totalDoneMinutes = 0;
+    int doneCountWithTime = 0;
+    for (final d in dones) {
+      int dur = d.computedDurationMinutes ?? 0;
+      if (dur <= 0 && d.doneTimestamp != null) {
+        dur = d.doneTimestamp!.difference(d.timestamp).inMinutes;
+      }
+      if (dur > 0) {
+        totalDoneMinutes += dur;
+        doneCountWithTime++;
+      }
+    }
+    final avgDoneMinutes = doneCountWithTime > 0 ? (totalDoneMinutes ~/ doneCountWithTime) : 0;
+    final int completionRate = todos.isNotEmpty ? ((dones.length / todos.length) * 100).toInt() : 0;
+
+    String insightMsg;
+    if (todos.isEmpty) {
+      insightMsg = '아직 등록된 TODO가 없습니다. TODO를 기록해보세요!';
+    } else if (completionRate >= 80) {
+      insightMsg = '대단해요! 대부분의 목표를 완벽하게 완수하고 있습니다 🎉';
+    } else if (completionRate >= 50) {
+      insightMsg = '절반 이상의 목표를 달성하며 꾸준히 나아가고 있습니다 👍';
+    } else {
+      insightMsg = '차근차근 하나씩 완료해 나가며 달성률을 높여보세요 💪';
+    }
+
+    return _buildSectionCard(
+      title: '생산성 및 TODO 요약',
+      subtitle: '목표 달성률 및 작업 완료 속도를 분석합니다',
+      icon: Icons.task_alt_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: appSubtleBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: appBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'TODO 달성률',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: appTextSecondary,
+                      ),
+                    ),
+                    Text(
+                      '$completionRate%',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: chartColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: completionRate / 100.0,
+                    minHeight: 8,
+                    backgroundColor: isAppDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06),
+                    valueColor: AlwaysStoppedAnimation<Color>(chartColor),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  insightMsg,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: appTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _buildMetricTile('완료된 작업', '${dones.length}건', Icons.check_circle_outline_rounded, const Color(0xFF10B981)),
+              const SizedBox(width: 8),
+              _buildMetricTile('진행 중 TODO', '${pending.length}건', Icons.pending_actions_rounded, const Color(0xFFF59E0B)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildMetricTile('총 TODO 수', '${todos.length}건', Icons.format_list_bulleted_rounded, themeAccent),
+              const SizedBox(width: 8),
+              _buildMetricTile('평균 소요 시간', avgDoneMinutes > 0 ? _formatMinutes(avgDoneMinutes) : '-', Icons.timer_outlined, const Color(0xFF06B6D4)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricTile(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: appSubtleBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: appBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 16, color: color),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: appTextTertiary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: appText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopTasksCard(List<TimestampEntry> entries) {
+    final List<Map<String, dynamic>> tasksWithTime = [];
+
+    for (final e in entries) {
+      int dur = e.computedDurationMinutes ?? 0;
+      if (dur <= 0 && e.status == 'done' && e.doneTimestamp != null) {
+        dur = e.doneTimestamp!.difference(e.timestamp).inMinutes;
+      }
+      if (dur > 0) {
+        tasksWithTime.add({
+          'entry': e,
+          'duration': dur,
+        });
+      }
+    }
+
+    tasksWithTime.sort((a, b) => (b['duration'] as int).compareTo(a['duration'] as int));
+    final topTasks = tasksWithTime.take(5).toList();
+    final theme = ThemeController.instance.currentTheme;
+    final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+
+    return _buildSectionCard(
+      title: '집중 시간 랭킹',
+      subtitle: '가장 많은 시간을 투자한 활동 Top 5',
+      icon: Icons.leaderboard_outlined,
+      content: topTasks.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Text(
+                  '소요 시간이 기록된 활동이 없습니다.',
+                  style: GoogleFonts.inter(color: appTextTertiary, fontSize: 13),
+                ),
+              ),
+            )
+          : Column(
+              children: List.generate(topTasks.length, (index) {
+                final item = topTasks[index];
+                final entry = item['entry'] as TimestampEntry;
+                final dur = item['duration'] as int;
+                final catColor = _getCategoryColor(entry.category);
+
+                String rankBadge;
+                Color rankColor;
+                if (index == 0) {
+                  rankBadge = '🥇';
+                  rankColor = Colors.amber;
+                } else if (index == 1) {
+                  rankBadge = '🥈';
+                  rankColor = const Color(0xFFCBD5E1);
+                } else if (index == 2) {
+                  rankBadge = '🥉';
+                  rankColor = const Color(0xFFD97706);
+                } else {
+                  rankBadge = '#${index + 1}';
+                  rankColor = appTextSecondary;
+                }
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: appSubtleBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: index == 0 ? Colors.amber.withOpacity(0.3) : appBorder,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 26,
+                        child: Text(
+                          rankBadge,
+                          style: GoogleFonts.inter(
+                            fontSize: index < 3 ? 14 : 11,
+                            fontWeight: FontWeight.w800,
+                            color: rankColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.note.isEmpty ? '기록된 작업' : entry.note,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: appText,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: catColor.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text(
+                                      entry.category,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: catColor,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  DateFormat('MM.dd').format(entry.timestamp),
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 9,
+                                    color: appTextTertiary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: themeAccent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _formatMinutes(dur),
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: themeAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+    );
+  }
+
+  void _showTimetableSlotDetailsSheet(
+    BuildContext context,
+    DateTime date,
+    int hour,
+    List<TimestampEntry> entries,
+  ) {
+    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    final w = weekdays[(date.weekday - 1).clamp(0, 6)];
+    final theme = ThemeController.instance.currentTheme;
+    final isAppDark = theme.isDark;
+    final appCardBg = theme.cardBg;
+    final appText = theme.textColor;
+    final appTextSecondary = isAppDark ? Colors.white60 : const Color(0xFF64748B);
+    final appTextTertiary = isAppDark ? Colors.white38 : const Color(0xFF94A3B8);
+    final appSubtleBg = isAppDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04);
+    final appBorder = isAppDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.08);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
+          decoration: BoxDecoration(
+            color: appCardBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragUpdate: (details) {
+                      if (details.primaryDelta! > 7) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${date.month}월 ${date.day}일 ($w) ${hour.toString().padLeft(2, '0')}:00 ~ ${(hour + 1).toString().padLeft(2, '0')}:00',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              color: appText,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '총 ${entries.length}건의 활동 기록',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: appTextTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        color: appTextSecondary,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: entries.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final entry = entries[index];
+                        final catColor = _getCategoryColor(entry.category);
+                        final timeStr = DateFormat('HH:mm').format(entry.timestamp);
+                        final isTodo = entry.status == 'todo';
+                        final isDone = entry.status == 'done';
+
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: appSubtleBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: appBorder),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: catColor.withOpacity(0.16),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  timeStr,
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: catColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: catColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          entry.category,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: catColor,
+                                          ),
+                                        ),
+                                        if (isDone) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF10B981).withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '완료',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: const Color(0xFF10B981),
+                                              ),
+                                            ),
+                                          ),
+                                        ] else if (isTodo) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF59E0B).withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              'TODO',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: const Color(0xFFF59E0B),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      entry.text,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: appText,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showMatrixDayDetailsSheet(
+    BuildContext context,
+    DateTime date,
+    List<TimestampEntry> entries,
+  ) {
+    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    final w = weekdays[(date.weekday - 1).clamp(0, 6)];
+    final theme = ThemeController.instance.currentTheme;
+    final isAppDark = theme.isDark;
+    final appCardBg = theme.cardBg;
+    final appText = theme.textColor;
+    final appTextSecondary = isAppDark ? Colors.white60 : const Color(0xFF64748B);
+    final appTextTertiary = isAppDark ? Colors.white38 : const Color(0xFF94A3B8);
+    final appSubtleBg = isAppDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04);
+    final appBorder = isAppDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.08);
+
+    final sortedEntries = List<TimestampEntry>.from(entries)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.78,
+          ),
+          decoration: BoxDecoration(
+            color: appCardBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragUpdate: (details) {
+                      if (details.primaryDelta! > 7) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isAppDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${date.year}년 ${date.month}월 ${date.day}일 ($w)',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              color: appText,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            entries.isEmpty
+                                ? '기록된 활동이 없습니다'
+                                : '총 ${entries.length}건의 활동 타임라인',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: appTextTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        color: appTextSecondary,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (entries.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Center(
+                        child: Text(
+                          '해당 날짜에 기록된 활동이 없습니다.',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: appTextTertiary,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: sortedEntries.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final entry = sortedEntries[index];
+                          final catColor = _getCategoryColor(entry.category);
+                          final timeStr = DateFormat('HH:mm').format(entry.timestamp);
+                          final isTodo = entry.status == 'todo';
+                          final isDone = entry.status == 'done';
+
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: appSubtleBg,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: appBorder),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: catColor.withOpacity(isAppDark ? 0.2 : 0.12),
+                                    borderRadius: BorderRadius.circular(7),
+                                  ),
+                                  child: Text(
+                                    timeStr,
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: catColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 7,
+                                            height: 7,
+                                            decoration: BoxDecoration(
+                                              color: catColor,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            entry.category,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: catColor,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          if (isDone)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.green.withOpacity(0.15),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                'DONE',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.greenAccent,
+                                                ),
+                                              ),
+                                            )
+                                          else if (isTodo)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.withOpacity(0.15),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                'TODO',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.orangeAccent,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      if (entry.note.isNotEmpty) ...[
+                                        const SizedBox(height: 5),
+                                        Text(
+                                          entry.note,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            color: appText,
+                                            height: 1.35,
+                                          ),
+                                        ),
+                                      ],
+                                      if (entry.imagePath != null) ...[
+                                        const SizedBox(height: 8),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.file(
+                                            File(entry.imagePath!),
+                                            height: 80,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMonthlyTimeMatrixCard(List<TimestampEntry> allEntries) {
+    final now = DateTime.now();
+    final selectedMonth = _matrixMonth;
+    final startOfMonth = DateTime(selectedMonth.year, selectedMonth.month, 1);
+    final daysInMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+    final endOfMonth = DateTime(selectedMonth.year, selectedMonth.month, daysInMonth, 23, 59, 59);
+    final bool isCurrentMonth = now.year == selectedMonth.year && now.month == selectedMonth.month;
+
+    final monthEntries = allEntries.where((e) {
+      if (_selectedGlobalCategory != 'All' && e.category != _selectedGlobalCategory) return false;
+      return (e.timestamp.isAfter(startOfMonth.subtract(const Duration(milliseconds: 1))) &&
+              e.timestamp.isBefore(endOfMonth.add(const Duration(milliseconds: 1))));
+    }).toList();
+
+    final Map<int, List<TimestampEntry>> dayEntriesMap = {};
+    final Set<String> categoriesInMonth = {};
+    for (final e in monthEntries) {
+      final day = e.timestamp.day;
+      dayEntriesMap.putIfAbsent(day, () => []).add(e);
+      categoriesInMonth.add(e.category);
+    }
+
+    final theme = ThemeController.instance.currentTheme;
+    final isDark = theme.isDark;
+    final themeAccent = (!isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+
+    const weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+
+    return _buildSectionCard(
+      title: '월간 타임 매트릭스',
+      subtitle: '세로(날짜 1~${daysInMonth}일) × 가로(24시간) 활동 타임라인',
+      icon: Icons.calendar_view_month_rounded,
+      selector: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _matrixMonth = DateTime(_matrixMonth.year, _matrixMonth.month - 1, 1);
+              });
+            },
+            icon: Icon(Icons.chevron_left_rounded, color: appTextSecondary),
+            style: IconButton.styleFrom(
+              backgroundColor: appSubtleBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _matrixMonth = DateTime(now.year, now.month, 1);
+              });
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${selectedMonth.year}년 ${selectedMonth.month}월',
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: appText,
+                      ),
+                    ),
+                    if (!isCurrentMonth) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: themeAccent.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '이번 달로',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: themeAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  '총 ${monthEntries.length}건 기록 • ${daysInMonth}일 중 ${dayEntriesMap.keys.length}일 활동',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: appTextTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _matrixMonth = DateTime(_matrixMonth.year, _matrixMonth.month + 1, 1);
+              });
+            },
+            icon: Icon(Icons.chevron_right_rounded, color: appTextSecondary),
+            style: IconButton.styleFrom(
+              backgroundColor: appSubtleBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 가로 시간축 눈금 헤더 (0시, 6시, 12시, 18시, 24시)
+          Container(
+            padding: const EdgeInsets.fromLTRB(54, 8, 4, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('00시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text('06시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text('12시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text('18시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text('24시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+              ],
+            ),
+          ),
+
+          // 세로 스크롤 날짜별 가로 타임 트랙 리스트
+          Container(
+            height: 380,
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.02),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: appBorder),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  itemCount: daysInMonth,
+                  itemBuilder: (context, index) {
+                    final day = index + 1;
+                    final dayDate = DateTime(selectedMonth.year, selectedMonth.month, day);
+                    final isToday = now.year == dayDate.year && now.month == dayDate.month && now.day == day;
+                    final weekday = dayDate.weekday; // 1~7 (월~일)
+                    final weekdayLabel = weekdayLabels[weekday - 1];
+                    final isSat = weekday == 6;
+                    final isSun = weekday == 7;
+                    final dayEntries = dayEntriesMap[day] ?? [];
+
+                    Color dateColor = appText;
+                    if (isToday) {
+                      dateColor = themeAccent;
+                    } else if (isSun) {
+                      dateColor = const Color(0xFFF43F5E);
+                    } else if (isSat) {
+                      dateColor = const Color(0xFF38BDF8);
+                    } else if (dayEntries.isEmpty) {
+                      dateColor = appTextTertiary;
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2.0),
+                      child: InkWell(
+                        onTap: () => _showMatrixDayDetailsSheet(context, dayDate, dayEntries),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: isToday
+                                ? themeAccent.withOpacity(isDark ? 0.12 : 0.08)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: isToday
+                                ? Border.all(color: themeAccent.withOpacity(0.4), width: 1.0)
+                                : null,
+                          ),
+                          child: Row(
+                            children: [
+                              // 날짜 라벨 (일 + 요일)
+                              SizedBox(
+                                width: 44,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      day.toString().padLeft(2, '0'),
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 11.5,
+                                        fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                                        color: dateColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      weekdayLabel,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                                        color: dateColor.withOpacity(0.85),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+
+                              // 우측 24시간 가로 타임 트랙
+                              Expanded(
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final trackWidth = constraints.maxWidth;
+                                    return Container(
+                                      height: 18,
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? Colors.white.withOpacity(0.04)
+                                            : Colors.black.withOpacity(0.03),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          // 6시, 12시, 18시 은은한 가이드라인
+                                          Positioned(
+                                            left: trackWidth * 0.25,
+                                            top: 0,
+                                            bottom: 0,
+                                            width: 1,
+                                            child: Container(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
+                                          ),
+                                          Positioned(
+                                            left: trackWidth * 0.50,
+                                            top: 0,
+                                            bottom: 0,
+                                            width: 1,
+                                            child: Container(color: isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.07)),
+                                          ),
+                                          Positioned(
+                                            left: trackWidth * 0.75,
+                                            top: 0,
+                                            bottom: 0,
+                                            width: 1,
+                                            child: Container(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
+                                          ),
+
+                                          // 기록 블록들
+                                          ...dayEntries.map((e) {
+                                            final catColor = _getCategoryColor(e.category);
+                                            final startFraction = (e.timestamp.hour + (e.timestamp.minute / 60.0)) / 24.0;
+                                            final durationMins = e.effectiveDurationMinutes;
+                                            final double blockFraction = (durationMins > 0)
+                                                ? (math.max(25, durationMins) / (24.0 * 60.0))
+                                                : (35.0 / (24.0 * 60.0));
+
+                                            final left = (startFraction * trackWidth).clamp(0.0, trackWidth - 8.0);
+                                            final width = (blockFraction * trackWidth).clamp(8.0, trackWidth - left);
+
+                                            return Positioned(
+                                              left: left,
+                                              top: 2,
+                                              bottom: 2,
+                                              width: width,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: catColor.withOpacity(isDark ? 0.88 : 0.82),
+                                                  borderRadius: BorderRadius.circular(3),
+                                                  border: Border.all(
+                                                    color: catColor,
+                                                    width: 0.6,
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: catColor.withOpacity(0.25),
+                                                      blurRadius: 2,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 하단 안내 텍스트 및 범례
+          Row(
+            children: [
+              Icon(Icons.touch_app_rounded, size: 13, color: appTextTertiary),
+              const SizedBox(width: 4),
+              Text(
+                '날짜를 탭하면 해당 일의 모든 기록 목록을 열람할 수 있습니다',
+                style: GoogleFonts.inter(fontSize: 11, color: appTextTertiary),
+              ),
+            ],
+          ),
+          if (categoriesInMonth.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: categoriesInMonth.map((cat) {
+                  final catColor = _getCategoryColor(cat);
+                  final count = monthEntries.where((e) => e.category == cat).length;
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: catColor.withOpacity(isDark ? 0.16 : 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: catColor.withOpacity(0.35), width: 0.8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(color: catColor, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          cat,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$count',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: themeAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeeklyTimetableCard(List<TimestampEntry> allEntries) {
+    final now = DateTime.now();
+    final todayOnly = DateTime(now.year, now.month, now.day);
+    final weekStart = DateTime(_selectedWeekStart.year, _selectedWeekStart.month, _selectedWeekStart.day);
+    final weekEnd = weekStart.add(const Duration(days: 7));
+    final currentWeekStart = todayOnly.subtract(Duration(days: todayOnly.weekday - 1));
+    final bool isCurrentWeek = weekStart == currentWeekStart;
+
+    final weekEntries = allEntries.where((e) {
+      if (_selectedGlobalCategory != 'All' && e.category != _selectedGlobalCategory) return false;
+      return (e.timestamp.isAfter(weekStart.subtract(const Duration(milliseconds: 1))) &&
+              e.timestamp.isBefore(weekEnd));
+    }).toList();
+
+    final Map<String, List<TimestampEntry>> slotEntries = {};
+    final Set<String> categoriesInWeek = {};
+    for (final e in weekEntries) {
+      final eDate = DateTime(e.timestamp.year, e.timestamp.month, e.timestamp.day);
+      final dayDiff = eDate.difference(weekStart).inDays;
+      if (dayDiff >= 0 && dayDiff < 7) {
+        final key = '${dayDiff}_${e.timestamp.hour}';
+        slotEntries.putIfAbsent(key, () => []).add(e);
+        categoriesInWeek.add(e.category);
+      }
+    }
+
+    final theme = ThemeController.instance.currentTheme;
+    final isDark = theme.isDark;
+    final themeAccent = (!isDark && theme.accent.computeLuminance() > 0.6)
+        ? const Color(0xFF4F46E5)
+        : theme.accent;
+
+    const weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+
+    final weekEndDisplay = weekStart.add(const Duration(days: 6));
+    final periodTitle = '${weekStart.month}.${weekStart.day} ~ ${weekEndDisplay.month}.${weekEndDisplay.day}';
+
+    return _buildSectionCard(
+      title: '주간 라이프 타임테이블',
+      subtitle: 'Outlook 스타일 가로(요일) × 세로(시간대) 활동 매트릭스',
+      icon: Icons.table_chart_rounded,
+      selector: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _selectedWeekStart = _selectedWeekStart.subtract(const Duration(days: 7));
+              });
+            },
+            icon: Icon(Icons.chevron_left_rounded, color: appTextSecondary),
+            style: IconButton.styleFrom(
+              backgroundColor: appSubtleBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedWeekStart = currentWeekStart;
+              });
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      periodTitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: appText,
+                      ),
+                    ),
+                    if (!isCurrentWeek) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: themeAccent.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '이번 주로',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: themeAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${weekEntries.length}건의 기록',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    color: appTextTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _selectedWeekStart = _selectedWeekStart.add(const Duration(days: 7));
+              });
+            },
+            icon: Icon(Icons.chevron_right_rounded, color: appTextSecondary),
+            style: IconButton.styleFrom(
+              backgroundColor: appSubtleBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Weekly Timetable Matrix Container
+          Container(
+            decoration: BoxDecoration(
+              color: appSubtleBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: appBorder),
+            ),
+            child: Column(
+              children: [
+                // 1. Day of Week Header
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                    border: Border(bottom: BorderSide(color: appBorder)),
+                  ),
+                  child: Row(
+                    children: [
+                      // Time Axis Space
+                      SizedBox(
+                        width: 38,
+                        child: Center(
+                          child: Icon(
+                            Icons.access_time_rounded,
+                            size: 14,
+                            color: appTextTertiary,
+                          ),
+                        ),
+                      ),
+                      // 7 Days
+                      ...List.generate(7, (i) {
+                        final dayDate = weekStart.add(Duration(days: i));
+                        final isToday = dayDate.year == now.year && dayDate.month == now.month && dayDate.day == now.day;
+                        final isWeekend = i >= 5;
+
+                        return Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                weekdayLabels[i],
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                                  color: isToday
+                                      ? themeAccent
+                                      : (isWeekend ? const Color(0xFFF59E0B) : appTextSecondary),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: isToday ? themeAccent : Colors.transparent,
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${dayDate.day}',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11,
+                                    fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                                    color: isToday ? Colors.white : appText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+
+                // 2. Vertical 24-Hour Scrollable Grid
+                SizedBox(
+                  height: 350,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      children: List.generate(24, (hour) {
+                        return Container(
+                          height: 34,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.04),
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              // Time Label Column
+                              SizedBox(
+                                width: 38,
+                                child: Center(
+                                  child: Text(
+                                    '${hour.toString().padLeft(2, '0')}:00',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: appTextTertiary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // 7 Day Cells
+                              ...List.generate(7, (dayIdx) {
+                                final dayDate = weekStart.add(Duration(days: dayIdx));
+                                final items = slotEntries['${dayIdx}_$hour'] ?? [];
+
+                                if (items.isEmpty) {
+                                  return Expanded(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.03),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final first = items.first;
+                                final catColor = _getCategoryColor(first.category);
+
+                                return Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(1.5),
+                                    child: InkWell(
+                                      onTap: () => _showTimetableSlotDetailsSheet(context, dayDate, hour, items),
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: catColor.withOpacity(isDark ? 0.38 : 0.22),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: catColor.withOpacity(0.65),
+                                            width: 1.0,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 2),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  width: 5,
+                                                  height: 5,
+                                                  decoration: BoxDecoration(
+                                                    color: catColor,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 2),
+                                                Expanded(
+                                                  child: Text(
+                                                    first.text.trim(),
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 8.5,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                if (items.length > 1)
+                                                  Text(
+                                                    '+${items.length - 1}',
+                                                    style: GoogleFonts.jetBrainsMono(
+                                                      fontSize: 7.5,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: catColor,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.touch_app_outlined, size: 14, color: appTextTertiary),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  '시간 블록을 터치하면 해당 시간대의 상세 활동 내역을 볼 수 있습니다',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: appTextTertiary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Category Legend Chips
+          if (categoriesInWeek.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: categoriesInWeek.map((cat) {
+                  final color = _getCategoryColor(cat);
+                  return Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: color.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                        const SizedBox(width: 5),
+                        Text(
+                          cat,
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityCalendarCard(List<TimestampEntry> entries) {
+    final monthEntries = entries.where((e) =>
+        e.timestamp.year == _calendarMonth.year &&
+        e.timestamp.month == _calendarMonth.month &&
+        (_selectedGlobalCategory == 'All' || e.category == _selectedGlobalCategory)).toList();
+
+    final int monthTotal = monthEntries.length;
+    final int monthDoneTodos = monthEntries.where((e) => e.status == 'done').length;
+    final int monthPendingTodos = monthEntries.where((e) => e.status == 'todo').length;
+
+    return _buildSectionCard(
+      title: '활동 캘린더',
+      subtitle: '월별 활동 일관성 및 날짜별 상세 기록을 확인합니다',
+      icon: Icons.calendar_month_rounded,
+      selector: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: _previousCalendarMonth,
+            icon: Icon(
+              Icons.chevron_left_rounded,
+              color: appTextSecondary,
+            ),
+            style: IconButton.styleFrom(
+              backgroundColor: appSubtleBg,
+            ),
+          ),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _formatDateKorean(_calendarMonth),
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: appText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$monthTotal건 기록됨',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: appTextTertiary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: _nextCalendarMonth,
+            icon: Icon(
+              Icons.chevron_right_rounded,
+              color: appTextSecondary,
+            ),
+            style: IconButton.styleFrom(
+              backgroundColor: appSubtleBg,
+            ),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Monthly Summary Banner (iOS Style)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            decoration: BoxDecoration(
+              color: appSubtleBg,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: appBorder),
+            ),
+            child: Row(
+              children: [
+                _buildMonthMetricItem(
+                  icon: Icons.history_rounded,
+                  label: '이번 달 기록',
+                  value: '$monthTotal',
+                  color: const Color(0xFF38BDF8),
+                ),
+                Container(width: 1, height: 26, color: appBorder),
+                _buildMonthMetricItem(
+                  icon: Icons.check_circle_outline_rounded,
+                  label: '처리한 TODO',
+                  value: '$monthDoneTodos',
+                  color: const Color(0xFF10B981),
+                ),
+                Container(width: 1, height: 26, color: appBorder),
+                _buildMonthMetricItem(
+                  icon: Icons.pending_actions_rounded,
+                  label: '남은 TODO',
+                  value: '$monthPendingTodos',
+                  color: const Color(0xFFF59E0B),
+                ),
+              ],
+            ),
+          ),
+          _buildActivityCalendar(entries),
+          if (_selectedCalendarDay != null) ...[
+            const SizedBox(height: 16),
+            _buildDayDetailList(entries),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthMetricItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 5),
+              Text(
+                value,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: appText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: appTextSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -2942,13 +11038,24 @@ class _InsightViewState extends State<InsightView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: ValueListenableBuilder<List<TimestampEntry>>(
           valueListenable: widget.entriesNotifier,
           builder: (context, entries, _) {
-            final filteredEntries = _getFilteredEntries(entries);
-            final totalCount = filteredEntries.length;
-            final categoryStats = _calculateStats(filteredEntries);
+            // Where My Time Goes 전용 필터 적용
+            final whereFilteredEntries = _getWhereFilteredEntries(entries);
+            final whereTotalCount = whereFilteredEntries.length;
+            final whereCategoryStats = _calculateStats(whereFilteredEntries);
+
+            // 다른 통계 카드용 (전역 카테고리 필터만 적용)
+            final globalFilteredEntries = entries.where((e) {
+              if (_selectedGlobalCategory != 'All' &&
+                  e.category != _selectedGlobalCategory) {
+                return false;
+              }
+              return true;
+            }).toList();
 
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
@@ -2957,367 +11064,80 @@ class _InsightViewState extends State<InsightView> {
                   padding: const EdgeInsets.all(16.0),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      const SizedBox(height: 16),
-
-                      ..._sectionOrder.map((section) {
-                        if (section == 'WHERE MY TIME GOES') {
-                          return _buildSectionCard(
-                            title: 'WHERE MY TIME GOES',
-                            selector: Column(
-                              children: [
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: _filters.map((filter) {
-                                      final isSelected =
-                                          _selectedFilter == filter;
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          right: 8.0,
-                                        ),
-                                        child: ChoiceChip(
-                                          label: Text(filter),
-                                          selected: isSelected,
-                                          selectedColor: const Color(
-                                            0xFF6366F1,
-                                          ),
-                                          backgroundColor: Colors.white
-                                              .withOpacity(0.05),
-                                          labelStyle: GoogleFonts.inter(
-                                            color: isSelected
-                                                ? Colors.white
-                                                : Colors.white.withOpacity(0.5),
-                                            fontWeight: isSelected
-                                                ? FontWeight.w700
-                                                : FontWeight.w500,
-                                            fontSize: 12,
-                                          ),
-                                          onSelected: (selected) {
-                                            if (selected)
-                                              setState(
-                                                () => _selectedFilter = filter,
-                                              );
-                                          },
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                            side: BorderSide(
-                                              color: isSelected
-                                                  ? const Color(0xFF6366F1)
-                                                  : Colors.white.withOpacity(
-                                                      0.1,
-                                                    ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                                if (_selectedFilter != 'All Time') ...[
-                                  const SizedBox(height: 20),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      IconButton(
-                                        onPressed: _previousPeriod,
-                                        icon: Icon(
-                                          Icons.chevron_left_rounded,
-                                          color: Colors.white.withOpacity(0.7),
-                                        ),
-                                        style: IconButton.styleFrom(
-                                          backgroundColor: Colors.white
-                                              .withOpacity(0.05),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () async {
-                                          final picked = await showDatePicker(
-                                            context: context,
-                                            initialDate: _referenceDate,
-                                            firstDate: DateTime(2000),
-                                            lastDate: DateTime(2100),
-                                          );
-                                          if (picked != null)
-                                            setState(
-                                              () => _referenceDate = picked,
-                                            );
-                                        },
-                                        child: Text(
-                                          _getPeriodLabel(),
-                                          style: GoogleFonts.inter(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                            decoration:
-                                                TextDecoration.underline,
-                                            decorationColor: Colors.white
-                                                .withOpacity(0.3),
-                                          ),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        onPressed: _nextPeriod,
-                                        icon: Icon(
-                                          Icons.chevron_right_rounded,
-                                          color: Colors.white.withOpacity(0.7),
-                                        ),
-                                        style: IconButton.styleFrom(
-                                          backgroundColor: Colors.white
-                                              .withOpacity(0.05),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ],
-                            ),
-                            content: Column(
+                      // Header Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Total $totalCount Moments recorded',
+                                  '인사이트',
                                   style: GoogleFonts.inter(
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 18 * widget.uiScale,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.3,
+                                    color: appText,
                                   ),
                                 ),
-                                if (categoryStats.isNotEmpty) ...[
-                                  const SizedBox(height: 24),
-                                  Text(
-                                    'COMPOSITION (100%)',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white.withOpacity(0.3),
-                                      letterSpacing: 1.0,
-                                    ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '시간 활용과 활동 패턴을 한눈에 분석하세요',
+                                  style: GoogleFonts.inter(
+                                    color: appTextTertiary,
+                                    fontSize: 12.5 * widget.uiScale,
                                   ),
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    height: 12,
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.05),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: Row(
-                                      children: categoryStats.entries.map((
-                                        stat,
-                                      ) {
-                                        final pct =
-                                            stat.value['count'] / totalCount;
-                                        const palette = [
-                                          Color(0xFF6366F1),
-                                          Color(0xFF10B981),
-                                          Color(0xFFF59E0B),
-                                          Color(0xFFEF4444),
-                                          Color(0xFF06B6D4),
-                                          Color(0xFF8B5CF6),
-                                        ];
-                                        final ci =
-                                            categoryStats.keys.toList().indexOf(
-                                              stat.key,
-                                            ) %
-                                            palette.length;
-                                        return Expanded(
-                                          flex: (pct * 1000).toInt(),
-                                          child: Container(color: palette[ci]),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 32),
-                                  ...categoryStats.entries.map((stat) {
-                                    const palette = [
-                                      Color(0xFF6366F1),
-                                      Color(0xFF10B981),
-                                      Color(0xFFF59E0B),
-                                      Color(0xFFEF4444),
-                                      Color(0xFF06B6D4),
-                                      Color(0xFF8B5CF6),
-                                    ];
-                                    final ci =
-                                        categoryStats.keys.toList().indexOf(
-                                          stat.key,
-                                        ) %
-                                        palette.length;
-                                    return _buildStatRow(
-                                      stat.key,
-                                      stat.value,
-                                      totalCount,
-                                      color: palette[ci],
-                                    );
-                                  }),
-                                ] else ...[
-                                  const SizedBox(height: 32),
-                                  Center(
-                                    child: Column(
-                                      children: [
-                                        Icon(
-                                          Icons.insert_chart_outlined,
-                                          color: Colors.white.withOpacity(0.2),
-                                          size: 48,
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'No data in this period',
-                                          style: GoogleFonts.inter(
-                                            color: Colors.white.withOpacity(
-                                              0.4,
-                                            ),
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          );
-                        } else if (section == 'ACTIVITY CALENDAR') {
-                          final categories = [
-                            'All',
-                            ...entries.map((e) => e.category).toSet(),
-                          ];
-                          return _buildSectionCard(
-                            title: 'ACTIVITY CALENDAR',
-                            subtitle:
-                                'Visualizing consistency for specific activities',
-                            selector: Column(
-                              children: [
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: categories.map((cat) {
-                                      final isSelected =
-                                          _selectedCalendarCategory == cat;
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          right: 8.0,
-                                        ),
-                                        child: ChoiceChip(
-                                          label: Text(cat),
-                                          selected: isSelected,
-                                          selectedColor: const Color(
-                                            0xFF6366F1,
-                                          ),
-                                          backgroundColor: Colors.white
-                                              .withOpacity(0.05),
-                                          labelStyle: GoogleFonts.inter(
-                                            color: isSelected
-                                                ? Colors.white
-                                                : Colors.white.withOpacity(0.5),
-                                            fontWeight: isSelected
-                                                ? FontWeight.w700
-                                                : FontWeight.w500,
-                                            fontSize: 12,
-                                          ),
-                                          onSelected: (selected) {
-                                            if (selected)
-                                              setState(
-                                                () =>
-                                                    _selectedCalendarCategory =
-                                                        cat,
-                                              );
-                                          },
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                            side: BorderSide(
-                                              color: isSelected
-                                                  ? const Color(0xFF6366F1)
-                                                  : Colors.white.withOpacity(
-                                                      0.1,
-                                                    ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    IconButton(
-                                      onPressed: _previousMonth,
-                                      icon: Icon(
-                                        Icons.chevron_left_rounded,
-                                        color: Colors.white.withOpacity(0.7),
-                                      ),
-                                      style: IconButton.styleFrom(
-                                        backgroundColor: Colors.white
-                                            .withOpacity(0.05),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: _showMonthPicker,
-                                      child: Column(
-                                        children: [
-                                          Text(
-                                            DateFormat(
-                                              'MMMM yyyy',
-                                            ).format(_referenceDate),
-                                            style: GoogleFonts.inter(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                              decorationColor: Colors.white
-                                                  .withOpacity(0.3),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '${entries.where((e) => e.timestamp.year == _referenceDate.year && e.timestamp.month == _referenceDate.month && (_selectedCalendarCategory == 'All' || e.category == _selectedCalendarCategory)).length} Moments recorded',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.white.withOpacity(
-                                                0.4,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: _nextMonth,
-                                      icon: Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: Colors.white.withOpacity(0.7),
-                                      ),
-                                      style: IconButton.styleFrom(
-                                        backgroundColor: Colors.white
-                                            .withOpacity(0.05),
-                                      ),
-                                    ),
-                                  ],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
-                            content: Column(
-                              children: [
-                                _buildActivityCalendar(entries),
-                                if (_selectedCalendarDay != null) ...[
-                                  const SizedBox(height: 16),
-                                  _buildDayDetailList(entries),
-                                ],
-                              ],
+                          ),
+                          const SizedBox(width: 12),
+                          IconButton(
+                            onPressed: () => _showCardCustomizationSheet(context),
+                            tooltip: '통계 카드 편집',
+                            icon: const Icon(Icons.dashboard_customize_rounded, size: 20),
+                            color: isAppDark ? Colors.white70 : const Color(0xFF475569),
+                            style: IconButton.styleFrom(
+                              backgroundColor: isAppDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+                              padding: const EdgeInsets.all(10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
-                          );
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Top Common Category Filter
+                      _buildGlobalCategoryFilter(entries),
+                      const SizedBox(height: 16),
+
+                      // Dynamic Cards in order
+                      ..._cardOrder.where((id) => _cardVisibility[id] ?? true).map((id) {
+                        switch (id) {
+                          case 'weekly_timetable':
+                            return _buildWeeklyTimetableCard(entries);
+                          case 'monthly_time_matrix':
+                            return _buildMonthlyTimeMatrixCard(entries);
+                          case 'where_my_time_goes':
+                            return _buildWhereMyTimeGoesCard(whereFilteredEntries, whereTotalCount, whereCategoryStats);
+                          case 'activity_distribution_24h':
+                            return _build24HourDistributionCard(globalFilteredEntries);
+                          case 'weekday_pattern':
+                            return _buildWeekdayPatternCard(globalFilteredEntries);
+                          case 'productivity_summary':
+                            return _buildProductivitySummaryCard(globalFilteredEntries);
+                          case 'top_tasks':
+                            return _buildTopTasksCard(globalFilteredEntries);
+                          case 'activity_calendar':
+                            return _buildActivityCalendarCard(entries);
+                          default:
+                            return const SizedBox.shrink();
                         }
-                        return const SizedBox.shrink();
                       }).toList(),
                     ]),
                   ),
@@ -3331,44 +11151,39 @@ class _InsightViewState extends State<InsightView> {
   }
 
   Widget _buildActivityCalendar(List<TimestampEntry> entries) {
-    // Generate days for the reference month
     final firstDayOfMonth = DateTime(
-      _referenceDate.year,
-      _referenceDate.month,
+      _calendarMonth.year,
+      _calendarMonth.month,
       1,
     );
     final lastDayOfMonth = DateTime(
-      _referenceDate.year,
-      _referenceDate.month + 1,
+      _calendarMonth.year,
+      _calendarMonth.month + 1,
       0,
     );
     final daysInMonth = lastDayOfMonth.day;
-    final startWeekday = firstDayOfMonth.weekday; // 1-7 (Mon-Sun)
+    final startWeekday = firstDayOfMonth.weekday;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Calendar Grid
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.03),
+            color: appSubtleBg,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: appBorder),
           ),
           child: Column(
             children: [
-              // Weekday Headers
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day) {
-                  return SizedBox(
-                    width: 32,
+                children: ['월', '화', '수', '목', '금', '토', '일'].map((day) {
+                  return Expanded(
                     child: Center(
                       child: Text(
                         day,
                         style: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.2),
+                          color: appTextTertiary,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
@@ -3378,7 +11193,6 @@ class _InsightViewState extends State<InsightView> {
                 }).toList(),
               ),
               const SizedBox(height: 16),
-              // Days Grid
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -3387,7 +11201,7 @@ class _InsightViewState extends State<InsightView> {
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
                 ),
-                itemCount: 42, // Show up to 6 weeks
+                itemCount: 42,
                 itemBuilder: (context, index) {
                   final dayOffset = index - (startWeekday - 1);
                   if (dayOffset < 0 || dayOffset >= daysInMonth) {
@@ -3396,15 +11210,14 @@ class _InsightViewState extends State<InsightView> {
 
                   final day = dayOffset + 1;
                   final currentDayDate = DateTime(
-                    _referenceDate.year,
-                    _referenceDate.month,
+                    _calendarMonth.year,
+                    _calendarMonth.month,
                     day,
                   );
 
-                  // Check if this day has matching records
                   final dayEntries = entries.where((e) {
-                    if (_selectedCalendarCategory != 'All' &&
-                        e.category != _selectedCalendarCategory) {
+                    if (_selectedGlobalCategory != 'All' &&
+                        e.category != _selectedGlobalCategory) {
                       return false;
                     }
 
@@ -3433,9 +11246,9 @@ class _InsightViewState extends State<InsightView> {
 
                   final bool isActive = dayEntries.isNotEmpty;
                   final color = isActive
-                      ? (_selectedCalendarCategory == 'All'
-                            ? const Color(0xFF6366F1)
-                            : _getCategoryColor(_selectedCalendarCategory))
+                      ? (_selectedGlobalCategory != 'All'
+                            ? _getCategoryColor(_selectedGlobalCategory)
+                            : _getCategoryColor(dayEntries.first.category))
                       : Colors.transparent;
 
                   final bool isSelected =
@@ -3468,7 +11281,7 @@ class _InsightViewState extends State<InsightView> {
                               ? color
                               : (isActive
                                     ? color.withOpacity(0.5)
-                                    : Colors.white.withOpacity(0.05)),
+                                    : appBorder),
                           width: isSelected ? 2 : 1,
                         ),
                       ),
@@ -3480,7 +11293,7 @@ class _InsightViewState extends State<InsightView> {
                                 ? Colors.white
                                 : (isActive
                                       ? color
-                                      : Colors.white.withOpacity(0.3)),
+                                      : appTextTertiary),
                             fontSize: 12,
                             fontWeight: isSelected || isActive
                                 ? FontWeight.w800
@@ -3539,12 +11352,11 @@ class _InsightViewState extends State<InsightView> {
   Widget _buildDayDetailList(List<TimestampEntry> entries) {
     if (_selectedCalendarDay == null) return const SizedBox.shrink();
 
-    // Collect all records for the day: normal entries + DONE events + TARGET dates
     final List<Map<String, dynamic>> dayRecords = [];
 
     for (final entry in entries) {
-      if (_selectedCalendarCategory != 'All' &&
-          entry.category != _selectedCalendarCategory) {
+      if (_selectedGlobalCategory != 'All' &&
+          entry.category != _selectedGlobalCategory) {
         continue;
       }
 
@@ -3552,8 +11364,15 @@ class _InsightViewState extends State<InsightView> {
           entry.timestamp.year == _selectedCalendarDay!.year &&
           entry.timestamp.month == _selectedCalendarDay!.month &&
           entry.timestamp.day == _selectedCalendarDay!.day;
+
+      final sameDone = entry.status == 'done' &&
+          entry.doneTimestamp != null &&
+          entry.doneTimestamp!.year == _selectedCalendarDay!.year &&
+          entry.doneTimestamp!.month == _selectedCalendarDay!.month &&
+          entry.doneTimestamp!.day == _selectedCalendarDay!.day;
           
-      if (sameCreated) {
+      // 같은 날 생성되고 같은 날 완료된 건은 todo_created로 중복 추가하지 않고 done으로만 표시
+      if (sameCreated && !sameDone) {
         dayRecords.add({
           'entry': entry,
           'time': entry.timestamp,
@@ -3577,12 +11396,6 @@ class _InsightViewState extends State<InsightView> {
         });
       }
 
-      final sameDone = entry.status == 'done' &&
-          entry.doneTimestamp != null &&
-          entry.doneTimestamp!.year == _selectedCalendarDay!.year &&
-          entry.doneTimestamp!.month == _selectedCalendarDay!.month &&
-          entry.doneTimestamp!.day == _selectedCalendarDay!.day;
-          
       if (sameDone) {
         dayRecords.add({
           'entry': entry,
@@ -3592,7 +11405,6 @@ class _InsightViewState extends State<InsightView> {
       }
     }
 
-    // Sort chronologically
     dayRecords.sort(
       (a, b) => (a['time'] as DateTime).compareTo(b['time'] as DateTime),
     );
@@ -3600,9 +11412,9 @@ class _InsightViewState extends State<InsightView> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: appSubtleBg,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: appBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3610,19 +11422,23 @@ class _InsightViewState extends State<InsightView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                DateFormat('MMMM d, yyyy').format(_selectedCalendarDay!),
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
+              Expanded(
+                child: Text(
+                  _formatDateKorean(_selectedCalendarDay!, includeWeekday: true),
+                  style: GoogleFonts.inter(
+                    color: appText,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               IconButton(
                 onPressed: () => setState(() => _selectedCalendarDay = null),
-                icon: const Icon(
+                icon: Icon(
                   Icons.close_rounded,
-                  color: Colors.white54,
+                  color: appTextSecondary,
                   size: 20,
                 ),
                 visualDensity: VisualDensity.compact,
@@ -3635,9 +11451,9 @@ class _InsightViewState extends State<InsightView> {
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: Text(
-                  'No records for this day',
+                  '이 날짜의 기록이 없습니다',
                   style: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.3),
+                    color: appTextTertiary,
                     fontSize: 13,
                   ),
                 ),
@@ -3659,12 +11475,36 @@ class _InsightViewState extends State<InsightView> {
   ) {
     if (entries.isEmpty) return {};
     final Map<String, int> counts = {};
+    final Map<String, int> durations = {};
+    int totalDuration = 0;
+
     for (var entry in entries) {
       counts[entry.category] = (counts[entry.category] ?? 0) + 1;
+      int dur = entry.computedDurationMinutes ?? 0;
+      if (dur <= 0 && entry.status == 'done' && entry.doneTimestamp != null) {
+        dur = entry.doneTimestamp!.difference(entry.timestamp).inMinutes;
+      }
+      if (dur > 0) {
+        durations[entry.category] = (durations[entry.category] ?? 0) + dur;
+        totalDuration += dur;
+      }
     }
-    return counts.map(
-      (k, v) => MapEntry(k, {'percentage': v / entries.length, 'count': v}),
-    );
+
+    final bool hasTimeData = totalDuration > 0;
+
+    return counts.map((k, count) {
+      final catDuration = durations[k] ?? 0;
+      final double percentage = hasTimeData
+          ? (totalDuration > 0 ? catDuration / totalDuration : 0.0)
+          : (count / entries.length);
+      return MapEntry(k, {
+        'percentage': percentage,
+        'count': count,
+        'durationMinutes': catDuration,
+        'totalDurationMinutes': totalDuration,
+        'hasTimeData': hasTimeData,
+      });
+    });
   }
 
   Widget _buildStatRow(
@@ -3674,8 +11514,17 @@ class _InsightViewState extends State<InsightView> {
     Color? color,
   }) {
     final effectiveColor = color ?? _getCategoryColor(category);
-    final double percentage = data['percentage'];
-    final int count = data['count'];
+    final double percentage = (data['percentage'] as num).toDouble();
+    final int count = data['count'] as int;
+    final int duration = data['durationMinutes'] as int? ?? 0;
+    final bool hasTimeData = data['hasTimeData'] as bool? ?? false;
+
+    String subtitle;
+    if (hasTimeData && duration > 0) {
+      subtitle = '${_formatMinutes(duration)} 소요 • $count건';
+    } else {
+      subtitle = '$count / $total Moments';
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -3684,27 +11533,34 @@ class _InsightViewState extends State<InsightView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    category,
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      category,
+                      style: GoogleFonts.inter(
+                        color: appText,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Text(
-                    '$count / $total Moments',
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.3),
-                      fontWeight: FontWeight.w500,
-                      fontSize: 11,
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        color: appTextTertiary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
                 '${(percentage * 100).toStringAsFixed(1)}%',
                 style: GoogleFonts.jetBrainsMono(
@@ -3720,12 +11576,12 @@ class _InsightViewState extends State<InsightView> {
             height: 6,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: effectiveColor.withOpacity(0.1),
+              color: isAppDark ? effectiveColor.withOpacity(0.12) : Colors.black.withOpacity(0.06),
               borderRadius: BorderRadius.circular(3),
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
-              widthFactor: percentage,
+              widthFactor: percentage.clamp(0.0, 1.0),
               child: Container(
                 decoration: BoxDecoration(
                   color: effectiveColor,
@@ -3745,9 +11601,10 @@ class _InsightViewState extends State<InsightView> {
     );
   }
 
-
-
   Color _getCategoryColor(String category) {
+    if (widget.categoryColors != null && widget.categoryColors!.containsKey(category)) {
+      return widget.categoryColors![category]!;
+    }
     switch (category) {
       case 'General':
         return const Color(0xFF64748B);
@@ -3807,7 +11664,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
     if (type == 'done') {
       accentColor = adjustedColor;
       typeIcon = Icons.check_circle_outline_rounded;
-      typeLabel = 'DONE';
+      typeLabel = '완료';
     } else if (type == 'todo_created') {
       accentColor = adjustedColor;
       typeIcon = Icons.radio_button_unchecked_rounded;
@@ -3815,7 +11672,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
     } else if (type == 'todo_target') {
       accentColor = adjustedColor;
       typeIcon = Icons.flag_rounded;
-      typeLabel = 'TARGET';
+      typeLabel = '목표';
     } else {
       accentColor = baseColor;
       typeIcon = Icons.fiber_manual_record_rounded;
@@ -3844,7 +11701,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                   Text(
                     DateFormat('HH:mm').format(time),
                     style: GoogleFonts.jetBrainsMono(
-                      color: Colors.white.withOpacity(0.5),
+                      color: appTextTertiary,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -3855,7 +11712,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
             const SizedBox(width: 8),
             Container(
               width: 3,
-              height: 36,
+              height: 28,
               decoration: BoxDecoration(
                 color: accentColor,
                 borderRadius: BorderRadius.circular(2),
@@ -3869,20 +11726,24 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                   Row(
                     children: [
                       if (typeLabel.isNotEmpty) ...[
-                        Icon(typeIcon, size: 12, color: accentColor),
-                        const SizedBox(width: 4),
+                        Icon(typeIcon, size: 14, color: accentColor),
+                        const SizedBox(width: 5),
                       ],
                       Expanded(
                         child: Text(
                           entry.note,
                           style: GoogleFonts.inter(
                             color: (type == 'done')
-                                ? Colors.white.withOpacity(0.9)
-                                : Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
+                                ? appTextSecondary
+                                : appText,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13.5,
+                            height: 1.35,
+                            decoration: (type == 'done')
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
-                          maxLines: _isExpanded ? null : 1,
+                          maxLines: _isExpanded ? null : 2,
                           overflow: _isExpanded
                               ? TextOverflow.visible
                               : TextOverflow.ellipsis,
@@ -3890,89 +11751,45 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: accentColor.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          entry.category.toUpperCase(),
-                          style: GoogleFonts.inter(
-                            color: accentColor,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 7,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ),
-                      if (typeLabel.isNotEmpty) ...[
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: (type == 'todo_created' || type == 'todo_target') 
-                                ? accentColor 
-                                : accentColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(5),
-                            border: (type == 'done') 
-                                ? Border.all(color: accentColor.withOpacity(0.3)) 
-                                : null,
-                          ),
-                          child: Text(
-                            typeLabel,
-                            style: GoogleFonts.inter(
-                              color: (type == 'todo_created' || type == 'todo_target') 
-                                  ? Colors.white 
-                                  : accentColor,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 7,
-                              letterSpacing: 1,
+                  if (type == 'done') ...[
+                    if (entry.doneImagePath != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(
+                              File(entry.doneImagePath!),
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox.shrink(),
                             ),
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                  if (entry.imagePath != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                      ),
+                  ] else ...[
+                    if (entry.imagePath != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxHeight: 200),
-                          child: Image.file(
-                            File(entry.imagePath!),
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const SizedBox.shrink(),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(
+                              File(entry.imagePath!),
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox.shrink(),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  if (type == 'done' && entry.doneImagePath != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 200),
-                          child: Image.file(
-                            File(entry.doneImagePath!),
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const SizedBox.shrink(),
-                          ),
-                        ),
-                      ),
-                    ),
+                  ],
                   if (_isExpanded) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     // DONE details
                     if (type == 'done' && entry.doneNote != null && entry.doneNote!.isNotEmpty)
                       Padding(
@@ -3985,16 +11802,16 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                                 Icon(
                                   Icons.edit_note_rounded,
                                   size: 14,
-                                  color: accentColor.withOpacity(0.5),
+                                  color: accentColor.withOpacity(0.7),
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 5),
                                 Text(
-                                  'NOTE',
+                                  '완료 메모',
                                   style: GoogleFonts.inter(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    color: accentColor.withOpacity(0.5),
-                                    letterSpacing: 0.5,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: accentColor.withOpacity(0.8),
+                                    letterSpacing: 0.2,
                                   ),
                                 ),
                               ],
@@ -4003,8 +11820,8 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                             Text(
                               entry.doneNote!,
                               style: GoogleFonts.inter(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 14,
+                                color: appTextSecondary,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -4020,16 +11837,16 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                           children: [
                             Icon(
                               Icons.timer_rounded,
-                              size: 11,
-                              color: accentColor.withOpacity(0.6),
+                              size: 12,
+                              color: accentColor.withOpacity(0.8),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 5),
                             Text(
-                              'ACTUAL: ${entry.computedDurationMinutes}m',
+                              '소요 시간: ${entry.computedDurationMinutes}분',
                               style: GoogleFonts.jetBrainsMono(
-                                fontSize: 9,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: accentColor.withOpacity(0.6),
+                                color: accentColor.withOpacity(0.8),
                               ),
                             ),
                           ],
@@ -4045,7 +11862,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                             Icon(
                               Icons.schedule_rounded,
                               size: 12,
-                              color: Colors.white.withOpacity(0.3),
+                              color: appTextTertiary,
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -4053,7 +11870,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                               style: GoogleFonts.jetBrainsMono(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white.withOpacity(0.3),
+                                color: appTextTertiary,
                               ),
                             ),
                           ],
