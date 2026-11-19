@@ -8,6 +8,8 @@
 	<string>We need microphone access for camera functionality.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need photo library access to save and select your moments.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need permission to save photos to your album.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -72,5 +74,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~1458002511</string>
 </dict>
 </plist>

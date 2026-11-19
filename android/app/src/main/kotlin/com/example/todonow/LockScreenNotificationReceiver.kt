@@ -18,6 +18,7 @@ import androidx.core.app.RemoteInput
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -128,9 +129,9 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
                 val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent(context, MainActivity::class.java)
                 val contentPendingIntent = PendingIntent.getActivity(context, 100, launchIntent, immFlags)
 
-                // Direct Reply Action (+ 빠른 추가)
+                // Direct Reply Action (+ 빠른 기록)
                 val remoteInput = RemoteInput.Builder(REMOTE_INPUT_KEY)
-                    .setLabel("새로운 할 일 입력...")
+                    .setLabel("지금 이 순간을 기록해보세요...")
                     .build()
 
                 val addIntent = Intent(context, LockScreenNotificationReceiver::class.java).apply {
@@ -140,7 +141,7 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
 
                 val addAction = NotificationCompat.Action.Builder(
                     android.R.drawable.ic_input_add,
-                    "+ 빠른 추가",
+                    "+ 빠른 기록",
                     addPendingIntent
                 ).addRemoteInput(remoteInput)
                  .setShowsUserInterface(false)
@@ -160,13 +161,13 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
 
                 if (pendingCount == 0 || topTodo == null) {
                     // Always stay visible on lock screen even with 0 todos!
-                    val title = "✨ 모든 TODO 완료!"
-                    val body = "대기 중인 할 일이 없습니다. 아래 [+ 빠른 추가]로 바로 기록하세요."
+                    val title = "🌿 잠시 여유가 있다면,"
+                    val body = "스치는 생각이나 지금 이 순간을 가볍게 남겨보세요."
                     builder.setContentTitle(title)
                         .setContentText(body)
                         .setStyle(
                             NotificationCompat.BigTextStyle()
-                                .bigText("모든 할 일을 마쳤습니다! 새로운 할 일이 생기면 아래 [+ 빠른 추가]를 눌러 바로 입력하세요.")
+                                .bigText("잠시 여유가 있다면, 지금 떠오르는 생각이나 순간을 아래 [+ 빠른 기록]으로 가볍게 남겨보세요.")
                                 .setBigContentTitle(title)
                         )
                 } else {
@@ -176,15 +177,31 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
 
                     var subtitle = ""
                     if (targetDate > 0) {
-                        val diff = targetDate - System.currentTimeMillis()
+                        val calNow = Calendar.getInstance().apply {
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        val calTarget = Calendar.getInstance().apply {
+                            timeInMillis = targetDate
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        val diffDays = ((calTarget.timeInMillis - calNow.timeInMillis) / (24 * 3600 * 1000L)).toInt()
                         val sdf = SimpleDateFormat("M/d HH:mm", Locale.KOREA)
-                        subtitle = if (diff < 0) {
+                        val timeFormat = SimpleDateFormat("HH:mm", Locale.KOREA)
+
+                        subtitle = if (targetDate < System.currentTimeMillis()) {
                             "🚨 기한 지남 (${sdf.format(Date(targetDate))})"
-                        } else if (diff < 24 * 3600 * 1000L) {
-                            val timeFormat = SimpleDateFormat("HH:mm", Locale.KOREA)
-                            "⏰ 마감: 오늘 ${timeFormat.format(Date(targetDate))}"
+                        } else if (diffDays == 0) {
+                            "⏰ 오늘 마감 (${timeFormat.format(Date(targetDate))})"
+                        } else if (diffDays == 1) {
+                            "⏳ 내일 마감 (D-1) (${timeFormat.format(Date(targetDate))})"
                         } else {
-                            "📅 마감: ${sdf.format(Date(targetDate))}"
+                            "⏳ 마감 D-$diffDays (${sdf.format(Date(targetDate))})"
                         }
                     }
 
@@ -239,6 +256,8 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
                 Log.d(TAG, "ACTION_ADD_TODO received text=$inputText")
                 if (!inputText.isNullOrEmpty()) {
                     addNewTodo(context, inputText)
+                } else {
+                    updateNotification(context, force = true)
                 }
             }
             ACTION_COMPLETE_TODO -> {
@@ -292,7 +311,7 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
             Log.d(TAG, "Saved new TODO to SharedPreferences: $note")
 
             // Re-post notification immediately -> IMMEDIATELY STOPS SPINNER!
-            updateNotification(context)
+            updateNotification(context, force = true)
 
             // Notify running app to update UI in real-time without delay
             val updateIntent = Intent("com.example.todonow.ACTION_ENTRIES_UPDATED").apply {
@@ -339,7 +358,7 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
                 prefs.edit().putString(KEY_ENTRIES, array.toString()).commit()
                 Log.d(TAG, "Completed top TODO at index $topIndex")
 
-                updateNotification(context)
+                updateNotification(context, force = true)
 
                 val updateIntent = Intent("com.example.todonow.ACTION_ENTRIES_UPDATED").apply {
                     setPackage(context.packageName)

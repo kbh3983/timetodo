@@ -220,23 +220,43 @@ class LockScreenNotificationService {
   }) async {
     await init();
 
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> savedActiveIds =
+        prefs.getStringList('chronos_active_deadline_ids') ?? [];
+    final Set<int> persistentActiveIds = savedActiveIds
+        .map((s) => int.tryParse(s) ?? 0)
+        .where((id) => id > 0)
+        .toSet();
+
     if (!enabled) {
-      for (final id in _activeDeadlineIds) {
+      final allCancelIds = _activeDeadlineIds.union(persistentActiveIds);
+      for (final id in allCancelIds) {
         try {
           await _plugin.cancel(id);
         } catch (_) {}
       }
       _activeDeadlineIds.clear();
+      await prefs.remove('chronos_active_deadline_ids');
+      await prefs.remove('chronos_deadline_notified_stages');
       return;
     }
 
     final now = DateTime.now();
-    // 마감일이 있는 미완료 TODO 중 D-3일 이내 (72시간 이내)이거나 이미 기한이 지난 항목 추출
+    final today = DateTime(now.year, now.month, now.day);
+    // 마감일이 있는 미완료 TODO 중 D-3일 이내이거나 이미 기한이 지난 항목 추출 (날짜 기준 정확한 계산)
     final pendingWithDeadline = entries.where((e) {
       if (e.status != 'todo' || e.targetDate == null) return false;
-      final diff = e.targetDate!.difference(now);
-      return diff.inSeconds <= 3 * 24 * 3600;
+      final target = DateTime(e.targetDate!.year, e.targetDate!.month, e.targetDate!.day);
+      final diffDays = target.difference(today).inDays;
+      return diffDays <= 3;
     }).toList();
+
+    final String notifiedStagesJson =
+        prefs.getString('chronos_deadline_notified_stages') ?? '{}';
+    Map<String, dynamic> notifiedStages = {};
+    try {
+      notifiedStages = jsonDecode(notifiedStagesJson);
+    } catch (_) {}
 
     final currentIds = <int>{};
 
@@ -244,35 +264,63 @@ class LockScreenNotificationService {
       final notifId = kDeadlineAlertBaseId + (item.id.hashCode.abs() % 10000);
       currentIds.add(notifId);
 
-      final diff = item.targetDate!.difference(now);
+      final target = DateTime(item.targetDate!.year, item.targetDate!.month, item.targetDate!.day);
+      final diffDays = target.difference(today).inDays;
+      final bool isOverdue = item.targetDate!.isBefore(now);
+
+      String stage;
       String title;
       String body;
 
-      if (diff.isNegative) {
+      if (isOverdue) {
+        stage = 'overdue';
         title = '🚨 [마감 경과] ${item.category} TODO';
         body =
             '${item.note.isEmpty ? "할 일" : item.note}\n마감 기한이 지났습니다! (${DateFormat('M월 d일 HH:mm').format(item.targetDate!)})';
-      } else if (diff.inHours < 24) {
+      } else if (diffDays == 0) {
+        stage = 'today';
         title = '⏰ [오늘 마감!] ${item.category} TODO';
         body =
             '${item.note.isEmpty ? "할 일" : item.note}\n오늘 ${DateFormat('HH:mm').format(item.targetDate!)} 마감 예정입니다!';
       } else {
-        final days = (diff.inHours / 24).ceil();
+        final days = diffDays;
+        stage = 'd_$days';
         title = '⏳ [마감 D-$days] ${item.category} TODO';
         body =
             '${item.note.isEmpty ? "할 일" : item.note}\n마감일시: ${DateFormat('M월 d일 HH:mm').format(item.targetDate!)} ($days일 남음)';
       }
 
+      // 중복 알림 방지: 동일 마감 단계(stage) 및 내용에 대해 이미 알림이 전송되었다면 무시
+      // (사용자가 스와이프로 닫은 후 앱 복귀/화면전환 등으로 인한 의도치 않은 재알림 방지)
+      final String stageSignature = '${stage}_${item.note}';
+      final String? lastSignature = notifiedStages[item.id]?.toString();
+      if (lastSignature == stageSignature) {
+        continue;
+      }
+
+      // 1. 방금 등록한 항목(10분 이내)이면서 마감일까지 2일 이상 남은 경우,
+      // 등록 직후 불필요하게 바로 마감 임박 알림 소리가 울리지 않도록 단계만 등록하고 스킵
+      final bool isJustCreated = now.difference(item.timestamp).inMinutes < 10;
+      if (isJustCreated && diffDays >= 2) {
+        notifiedStages[item.id] = stageSignature;
+        continue;
+      }
+
+      notifiedStages[item.id] = stageSignature;
+
+      // 2. 심야 에티켓 보호 (밤 10시 ~ 아침 8시 사이에는 소리 및 진동을 끄고 무음 알림으로 표시)
+      final bool isNightTime = now.hour >= 22 || now.hour < 8;
+
       final androidDetails = AndroidNotificationDetails(
         'chronos_deadline_alerts',
         '마감 임박 TODO 알림',
         channelDescription: '마감일이 3일 이내인 TODO의 푸시 알림 및 잠금화면 표시',
-        importance: Importance.max,
-        priority: Priority.high,
+        importance: isNightTime ? Importance.low : Importance.max,
+        priority: isNightTime ? Priority.low : Priority.high,
         showWhen: true,
         onlyAlertOnce: true, // 데이터 갱신 시 반복 소리/진동 알림 방지
-        enableVibration: true,
-        playSound: true,
+        enableVibration: !isNightTime,
+        playSound: !isNightTime,
         visibility: NotificationVisibility.public,
         category: AndroidNotificationCategory.reminder,
         styleInformation: BigTextStyleInformation(
@@ -281,11 +329,13 @@ class LockScreenNotificationService {
         ),
       );
 
-      const darwinDetails = DarwinNotificationDetails(
+      final darwinDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
-        interruptionLevel: InterruptionLevel.timeSensitive,
+        presentSound: !isNightTime,
+        interruptionLevel: isNightTime
+            ? InterruptionLevel.passive
+            : InterruptionLevel.timeSensitive,
       );
 
       await _plugin.show(
@@ -300,7 +350,8 @@ class LockScreenNotificationService {
     }
 
     // 이미 완료되었거나 삭제되어 더 이상 마감 대상이 아닌 알림 정리
-    final toRemove = _activeDeadlineIds.difference(currentIds);
+    final allPreviousIds = _activeDeadlineIds.union(persistentActiveIds);
+    final toRemove = allPreviousIds.difference(currentIds);
     for (final id in toRemove) {
       try {
         await _plugin.cancel(id);
@@ -309,6 +360,19 @@ class LockScreenNotificationService {
     _activeDeadlineIds
       ..clear()
       ..addAll(currentIds);
+
+    // 완료/삭제된 항목의 알림 단계 기록 정리
+    final pendingIds = pendingWithDeadline.map((e) => e.id).toSet();
+    notifiedStages.removeWhere((id, _) => !pendingIds.contains(id));
+
+    await prefs.setStringList(
+      'chronos_active_deadline_ids',
+      currentIds.map((id) => id.toString()).toList(),
+    );
+    await prefs.setString(
+      'chronos_deadline_notified_stages',
+      jsonEncode(notifiedStages),
+    );
   }
 
   Future<void> updateTopTodo(
@@ -328,10 +392,10 @@ class LockScreenNotificationService {
         } else {
           await platform.invokeMethod('clearLockScreenTodo');
         }
-        return;
       } catch (e) {
         debugPrint('Error calling native lockscreen method: $e');
       }
+      return;
     }
 
     if (!enabled) {
@@ -343,15 +407,15 @@ class LockScreenNotificationService {
 
     final pendingTodos = entries.where((e) => e.status == 'todo').toList();
 
-    // 대기 중인 TODO가 없을 때도 잠금화면에서 바로 [+ 빠른 추가] 할 수 있도록 상시 알림 유지
+    // 대기 중인 TODO가 없을 때도 잠금화면에서 바로 [+ 빠른 기록] 할 수 있도록 상시 알림 유지
     if (pendingTodos.isEmpty) {
       final List<AndroidNotificationAction> emptyActions = [
         const AndroidNotificationAction(
           kActionAddTodo,
-          '+ 빠른 추가',
+          '+ 빠른 기록',
           inputs: <AndroidNotificationActionInput>[
             AndroidNotificationActionInput(
-              label: '새로운 할 일 입력...',
+              label: '지금 이 순간을 기록해보세요...',
               allowFreeFormInput: true,
             ),
           ],
@@ -373,8 +437,8 @@ class LockScreenNotificationService {
         category: AndroidNotificationCategory.reminder,
         actions: emptyActions,
         styleInformation: const BigTextStyleInformation(
-          '모든 할 일을 마쳤습니다! 새로운 할 일이 생기면 아래 [+ 빠른 추가]를 눌러 바로 입력하세요.',
-          contentTitle: '✨ 모든 TODO 완료',
+          '잠시 여유가 있다면, 지금 떠오르는 생각이나 순간을 아래 [+ 빠른 기록]으로 가볍게 남겨보세요.',
+          contentTitle: '🌿 잠시 여유가 있다면,',
         ),
       );
 
@@ -388,8 +452,8 @@ class LockScreenNotificationService {
 
       await _plugin.show(
         kNotificationId,
-        '✨ 모든 TODO 완료',
-        '새로운 할 일이 생기면 아래 [+ 빠른 추가]를 눌러 바로 입력하세요.',
+        '🌿 잠시 여유가 있다면,',
+        '스치는 생각이나 지금 이 순간을 가볍게 남겨보세요.',
         NotificationDetails(
           android: androidDetails,
           iOS: darwinDetails,
@@ -417,15 +481,20 @@ class LockScreenNotificationService {
     String subtitle = '';
     if (top.targetDate != null) {
       final now = DateTime.now();
-      final diff = top.targetDate!.difference(now);
-      if (diff.isNegative) {
+      final today = DateTime(now.year, now.month, now.day);
+      final target = DateTime(top.targetDate!.year, top.targetDate!.month, top.targetDate!.day);
+      final diffDays = target.difference(today).inDays;
+
+      if (top.targetDate!.isBefore(now)) {
         subtitle =
             '🚨 기한 지남 (${DateFormat('M/d HH:mm').format(top.targetDate!)})';
-      } else if (diff.inHours < 24) {
-        subtitle = '⏰ 마감: 오늘 ${DateFormat('HH:mm').format(top.targetDate!)}';
+      } else if (diffDays == 0) {
+        subtitle = '⏰ 오늘 마감 (${DateFormat('HH:mm').format(top.targetDate!)})';
+      } else if (diffDays == 1) {
+        subtitle = '⏳ 내일 마감 (D-1) (${DateFormat('HH:mm').format(top.targetDate!)})';
       } else {
         subtitle =
-            '📅 마감: ${DateFormat('M월 d일 HH:mm').format(top.targetDate!)}';
+            '⏳ 마감 D-$diffDays (${DateFormat('M월 d일 HH:mm').format(top.targetDate!)})';
       }
     }
 
@@ -440,10 +509,10 @@ class LockScreenNotificationService {
     final List<AndroidNotificationAction> actions = [
       const AndroidNotificationAction(
         kActionAddTodo,
-        '+ 빠른 추가',
+        '+ 빠른 기록',
         inputs: <AndroidNotificationActionInput>[
           AndroidNotificationActionInput(
-            label: '새로운 할 일 입력...',
+            label: '지금 이 순간을 기록해보세요...',
             allowFreeFormInput: true,
           ),
         ],
@@ -514,11 +583,18 @@ class LockScreenNotificationService {
 
   Future<void> clear() async {
     await clearTopTodo();
-    for (final id in _activeDeadlineIds) {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> savedActiveIds =
+        prefs.getStringList('chronos_active_deadline_ids') ?? [];
+    final allIds = _activeDeadlineIds.union(
+        savedActiveIds.map((s) => int.tryParse(s) ?? 0).where((id) => id > 0).toSet());
+    for (final id in allIds) {
       try {
         await _plugin.cancel(id);
       } catch (_) {}
     }
     _activeDeadlineIds.clear();
+    await prefs.remove('chronos_active_deadline_ids');
+    await prefs.remove('chronos_deadline_notified_stages');
   }
 }
