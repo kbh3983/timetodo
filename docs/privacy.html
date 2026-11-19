@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeTodo - 개인정보 처리방침 (Privacy Policy)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #131b2e;
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #00d2ff;
+            --accent-glow: rgba(0, 210, 255, 0.15);
+            --code-bg: #1e293b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.7;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 820px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .logo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 8px 18px;
+            border-radius: 999px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .logo-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .logo-title {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        .meta-info {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .lang-switch {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .lang-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            padding: 8px 18px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .lang-btn.active {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h2::before {
+            content: "";
+            display: inline-block;
+            width: 4px;
+            height: 18px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+            font-size: 15px;
+        }
+
+        p:last-child {
+            margin-bottom: 0;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 14px;
+        }
+
+        li {
+            position: relative;
+            padding-left: 20px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        li::before {
+            content: "•";
+            position: absolute;
+            left: 6px;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        strong {
+            color: var(--text-primary);
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .highlight-box {
+            background: rgba(0, 210, 255, 0.05);
+            border: 1px solid rgba(0, 210, 255, 0.2);
+            border-radius: 14px;
+            padding: 16px;
+            margin-top: 14px;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-top: 50px;
+            padding-top: 24px;
+            border-top: 1px solid var(--card-border);
+        }
+
+        .content-section {
+            display: none;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-badge">
+                <span class="logo-dot"></span>
+                <span class="logo-title">TIMETODO</span>
+            </div>
+            <h1 id="page-title">개인정보 처리방침</h1>
+            <p class="meta-info" id="page-subtitle">최종 수정일: 2026년 11월 19일 | 시행일자: 2026년 11월 19일</p>
+            <div class="lang-switch">
+                <button class="lang-btn active" onclick="setLang('ko')">🇰🇷 한국어</button>
+                <button class="lang-btn" onclick="setLang('en')">🇺🇸 English</button>
+            </div>
+        </header>
+
+        <!-- ==================== KOREAN SECTION ==================== -->
+        <div id="section-ko" class="content-section active">
+            <div class="card">
+                <h2>1. 개요 및 기본 원칙</h2>
+                <p><strong>TimeTodo</strong>(이하 "앱")는 사용자의 소중한 개인정보를 중요하게 생각하며, 「개인정보 보호법」 및 관련 법령을 준수합니다.</p>
+                <p>본 앱은 원칙적으로 <strong>회원가입이 필요 없으며, 별도의 외부 데이터베이스 서버를 운영하지 않습니다.</strong> 사용자가 생성하는 모든 할 일(TODO), 타임스탬프 기록, 카테고리 데이터는 사용자의 스마트폰 로컬 저장소에만 안전하게 보관됩니다.</p>
+            </div>
+
+            <div class="card">
+                <h2>2. 수집하는 정보 및 이용 목적</h2>
+                <p>앱은 서비스 제공을 위해 최소한의 기능만을 로컬에서 처리하며, 사용자를 식별할 수 있는 개인정보를 직접 수집하여 서버로 전송하지 않습니다.</p>
+                <ul>
+                    <li><strong>할 일 및 타임스탬프 기록:</strong> 사용자 본인의 일정 관리 및 분석 통계를 위해 기기 내부에만 암호화/저장됩니다.</li>
+                    <li><strong>기기 권한별 이용 목적:</strong>
+                        <div class="highlight-box">
+                            <ul>
+                                <li><strong>카메라 권한 (선택):</strong> 타임스탬프가 각인된 사진을 직접 촬영하기 위해서만 사용됩니다.</li>
+                                <li><strong>사진 및 보관함(갤러리) 권한 (선택):</strong> 촬영된 타임스탬프 사진을 기기 앨범에 저장하거나 기존 사진을 불러오기 위해 사용됩니다.</li>
+                                <li><strong>알림 권한 (선택):</strong> 잠금화면 최우선 TODO 확인 및 마감 알림을 사용자 기기에 로컬로 표시하기 위해 사용됩니다.</li>
+                            </ul>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>3. 제3자 서비스 및 광고 라이브러리</h2>
+                <p>본 앱은 무료 버전의 지속적인 유지보수 및 서비스 제공을 위해 구글(Google LLC)의 <strong>Google AdMob</strong> 광고 서비스를 탑재하고 있습니다.</p>
+                <p>Google AdMob은 맞춤형/비맞춤형 광고 게재 및 광고 효율성 분석을 위해 다음과 같은 비식별 정보를 자동으로 수집 및 처리할 수 있습니다:</p>
+                <ul>
+                    <li>광고 식별자 (Google Advertising ID / IDFA)</li>
+                    <li>기기 정보 (기기 모델, OS 버전, 언어 설정 등)</li>
+                    <li>광고 상호작용 데이터 및 진단 정보</li>
+                </ul>
+                <p>AdMob에서 수집하는 데이터에 대한 자세한 처리 기준은 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google 개인정보처리방침</a>을 참조하시기 바랍니다.</p>
+            </div>
+
+            <div class="card">
+                <h2>4. 개인정보의 보관 및 파기</h2>
+                <p>사용자의 모든 데이터는 기기 내부 로컬 저장소(SharedPreferences 등)에 저장되며, 개발자는 이에 접근할 수 없습니다.</p>
+                <ul>
+                    <li>사용자는 앱 내에서 개별 할 일, 카테고리, 기록을 직접 즉시 삭제할 수 있습니다.</li>
+                    <li>스마트폰에서 <strong>앱을 삭제(제거)</strong>하거나 <strong>앱 데이터/캐시 삭제</strong>를 진행할 경우 모든 로컬 저장 데이터는 복구 불가능하게 영구 파기됩니다.</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>5. 아동의 개인정보 보호</h2>
+                <p>본 앱은 만 13세 미만(또는 관할 법령상 기준 연령 미만) 아동의 개인정보를 고의로 수집하지 않습니다. 만약 보호자의 동의 없이 아동의 정보가 수집된 사실을 인지할 경우 즉시 필요한 조치를 취합니다.</p>
+            </div>
+
+            <div class="card">
+                <h2>6. 개인정보 보호책임자 및 문의처</h2>
+                <p>본 개인정보 처리방침에 관한 질문, 건의사항, 또는 권리 행사가 필요하신 경우 아래의 연락처로 문의해 주시기 바랍니다.</p>
+                <ul>
+                    <li><strong>앱 이름:</strong> TimeTodo (패키지명: <code>com.bebong.timetodo</code>)</li>
+                    <li><strong>개발자/관리자:</strong> kbh3983</li>
+                    <li><strong>GitHub 저장소:</strong> <a href="https://github.com/kbh3983/timetodo" target="_blank" rel="noopener noreferrer">https://github.com/kbh3983/timetodo</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ==================== ENGLISH SECTION ==================== -->
+        <div id="section-en" class="content-section">
+            <div class="card">
+                <h2>1. Overview & Core Principles</h2>
+                <p><strong>TimeTodo</strong> ("the App") values your privacy and is committed to protecting your personal data in accordance with applicable data protection laws and store guidelines.</p>
+                <p>The App <strong>does not require user registration or an account, and does not operate any external backend database server</strong>. All tasks (TODOs), timestamp records, categories, and settings created by the user are stored strictly and securely on the user's local device storage.</p>
+            </div>
+
+            <div class="card">
+                <h2>2. Information Collection & Usage</h2>
+                <p>The App processes minimal data strictly for local application functionality and never transmits personal data to external servers.</p>
+                <ul>
+                    <li><strong>Tasks & Timestamp Entries:</strong> Stored locally on the user's device for task tracking, habits, and productivity insights.</li>
+                    <li><strong>Device Permissions:</strong>
+                        <div class="highlight-box">
+                            <ul>
+                                <li><strong>Camera (Optional):</strong> Used exclusively to capture timestamped photos directly within the app.</li>
+                                <li><strong>Photo Library / Storage (Optional):</strong> Used to save captured timestamp photos to the device gallery or import photos.</li>
+                                <li><strong>Notifications (Optional):</strong> Used to deliver local notifications for deadline reminders and lock-screen task widgets.</li>
+                            </ul>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>3. Third-Party Services & Advertising</h2>
+                <p>To support ongoing maintenance and feature updates in the free version, the App integrates <strong>Google AdMob</strong> (provided by Google LLC).</p>
+                <p>Google AdMob may collect and process non-personally identifiable information to deliver personalized or non-personalized advertisements, including:</p>
+                <ul>
+                    <li>Advertising Identifiers (e.g., Google Advertising ID, Apple IDFA)</li>
+                    <li>Device metadata (model, operating system version, locale, network provider)</li>
+                    <li>Ad performance, interaction metrics, and crash diagnostics</li>
+                </ul>
+                <p>For more details on how Google processes ad data, please review the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</p>
+            </div>
+
+            <div class="card">
+                <h2>4. Data Retention & Deletion</h2>
+                <p>Because all user data is stored locally on the device (via SharedPreferences / local sandbox storage), the developer does not possess, store, or access your data.</p>
+                <ul>
+                    <li>You can edit or delete your tasks, logs, and categories at any time inside the App.</li>
+                    <li>Uninstalling the App or clearing app data will immediately and permanently erase all stored local data.</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>5. Children's Privacy</h2>
+                <p>The App is not directed to children under the age of 13. We do not knowingly collect personal information from children. If you believe that a child has provided us with personal data, please contact us so we can take appropriate action.</p>
+            </div>
+
+            <div class="card">
+                <h2>6. Developer & Contact Information</h2>
+                <p>If you have questions, feedback, or concerns regarding this Privacy Policy, please feel free to reach out via GitHub:</p>
+                <ul>
+                    <li><strong>Application:</strong> TimeTodo (Package: <code>com.bebong.timetodo</code>)</li>
+                    <li><strong>Developer:</strong> kbh3983</li>
+                    <li><strong>GitHub Repository:</strong> <a href="https://github.com/kbh3983/timetodo" target="_blank" rel="noopener noreferrer">https://github.com/kbh3983/timetodo</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2026 TimeTodo. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        function setLang(lang) {
+            const btns = document.querySelectorAll('.lang-btn');
+            btns.forEach(btn => btn.classList.remove('active'));
+
+            const sections = document.querySelectorAll('.content-section');
+            sections.forEach(sec => sec.classList.remove('active'));
+
+            if (lang === 'ko') {
+                btns[0].classList.add('active');
+                document.getElementById('section-ko').classList.add('active');
+                document.getElementById('page-title').innerText = '개인정보 처리방침';
+                document.getElementById('page-subtitle').innerText = '최종 수정일: 2026년 11월 19일 | 시행일자: 2026년 11월 19일';
+                document.documentElement.lang = 'ko';
+            } else {
+                btns[1].classList.add('active');
+                document.getElementById('section-en').classList.add('active');
+                document.getElementById('page-title').innerText = 'Privacy Policy';
+                document.getElementById('page-subtitle').innerText = 'Last updated: November 19, 2026 | Effective: November 19, 2026';
+                document.documentElement.lang = 'en';
+            }
+        }
+    </script>
+</body>
+</html>

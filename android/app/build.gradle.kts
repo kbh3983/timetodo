@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.todonow"
+    namespace = "com.bebong.timetodo"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.todonow"
+        applicationId = "com.bebong.timetodo"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

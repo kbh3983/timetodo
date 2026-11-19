@@ -1,0 +1,59 @@
+{
+  "@@locale": "en",
+  "appTitle": "TimeTodo",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+  "tabTasks": "Tasks",
+  "navTimeline": "Timeline",
+  "navCategory": "Category",
+  "tabInsights": "Insights",
+  "tabSettings": "Settings",
+  "tabCamera": "Camera",
+
+  "commonAdd": "Add",
+  "commonSave": "Save",
+  "commonCancel": "Cancel",
+  "commonDelete": "Delete",
+  "commonConfirm": "Confirm",
+  "commonDone": "Done",
+  "commonEdit": "Edit",
+  "commonClose": "Close",
+  "commonRetry": "Retry",
+
+  "proTitle": "TimeTodo Pro",
+  "proSubtitle": "An ad-free Pro version is coming soon!",
+  "proRemoveAds": "Remove All Ads",
+  "proRemoveAdsDesc": "Enjoy an uninterrupted experience with zero ads.",
+  "proComingSoonToast": "TimeTodo Pro (Ad-free version) will be available soon! 🚀",
+
+  "cheerDeveloperTitle": "Cheer the Developer",
+  "cheerDeveloperSubtitle": "Watch a short ad to support ongoing development and updates",
+  "cheerThankYouTitle": "Thank you for your warm support!",
+  "cheerThankYouSubtitle": "Your encouragement keeps us building a better app.",
+  "cheerAdLoading": "Preparing reward ad... Please try again in a moment.",
+
+  "settingsVersion": "Version",
+  "settingsTheme": "Theme",
+  "settingsSupport": "Support & Info",
+
+  "insightTimeStats": "Time Usage Stats",
+  "insightTimeStatsDesc": "Analyze elapsed time and share by category",
+  "insight24hPattern": "24-Hour Activity Pattern",
+  "insight24hPatternDesc": "See when you are most active throughout the day",
+  "insightWeeklyPattern": "Weekly Activity Pattern",
+  "insightWeeklyPatternDesc": "Compare activity frequency between weekdays and weekends",
+  "insightTodoCompletion": "Task Completion Rate",
+  "insightTodoCompletionDesc": "Track your completion speed and goal achievement",
+  "insightRanking": "Top Activities",
+  "insightRankingDesc": "Top 5 activities you invested the most time in",
+  "insightMonthlyTable": "Monthly Timeline",
+  "insightMonthlyTableDesc": "Days (1-31) × 24-hour activity timeline",
+  "insightWeeklyTable": "Weekly Matrix",
+  "insightWeeklyTableDesc": "Days of week × time slot activity matrix",
+  "insightCalendar": "Activity Calendar",
+  "insightCalendarDesc": "Review monthly consistency and daily detailed logs",
+
+  "todoInputHint": "What are you doing right now?",
+  "todoEmptyList": "No tasks yet. Start by adding one!"
+}

@@ -1,0 +1,7 @@
+/* Korean (한국어) */
+"CFBundleDisplayName" = "TimeTodo";
+"NSCameraUsageDescription" = "타임스탬프 사진 촬영을 위해 카메라 권한이 필요합니다.";
+"NSMicrophoneUsageDescription" = "카메라 기능 동작을 위해 마이크 권한이 필요합니다.";
+"NSPhotoLibraryUsageDescription" = "타임스탬프 사진을 불러오고 관리하기 위해 사진 보관함 접근 권한이 필요합니다.";
+"NSPhotoLibraryAddUsageDescription" = "촬영한 타임스탬프 사진을 갤러리에 저장하기 위해 앨범 저장 권한이 필요합니다.";
+

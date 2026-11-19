@@ -1,4 +1,4 @@
-package com.example.todonow
+package com.bebong.timetodo
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -12,7 +12,7 @@ import io.flutter.plugin.common.MethodChannel
 import androidx.core.app.NotificationManagerCompat
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.todonow/lockscreen"
+    private val CHANNEL = "com.bebong.timetodo/lockscreen"
     private var methodChannel: MethodChannel? = null
 
     private val entriesUpdateReceiver = object : BroadcastReceiver() {
@@ -24,7 +24,7 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val filter = IntentFilter("com.example.todonow.ACTION_ENTRIES_UPDATED")
+        val filter = IntentFilter("com.bebong.timetodo.ACTION_ENTRIES_UPDATED")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(entriesUpdateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {

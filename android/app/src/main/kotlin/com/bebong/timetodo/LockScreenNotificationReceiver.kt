@@ -1,4 +1,4 @@
-package com.example.todonow
+package com.bebong.timetodo
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -30,8 +30,8 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
         const val CHANNEL_ID = "chronos_lockscreen_silent_v3"
         const val CHANNEL_NAME = "잠금화면 상시 기록"
         const val REMOTE_INPUT_KEY = "key_quick_add_todo"
-        const val ACTION_ADD_TODO = "com.example.todonow.ACTION_ADD_TODO"
-        const val ACTION_COMPLETE_TODO = "com.example.todonow.ACTION_COMPLETE_TODO"
+        const val ACTION_ADD_TODO = "com.bebong.timetodo.ACTION_ADD_TODO"
+        const val ACTION_COMPLETE_TODO = "com.bebong.timetodo.ACTION_COMPLETE_TODO"
         const val PREFS_NAME = "FlutterSharedPreferences"
         const val KEY_ENTRIES = "flutter.chronos_entries"
         const val KEY_DEFAULT_CAT = "flutter.chronos_default_category"
@@ -314,7 +314,7 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
             updateNotification(context, force = true)
 
             // Notify running app to update UI in real-time without delay
-            val updateIntent = Intent("com.example.todonow.ACTION_ENTRIES_UPDATED").apply {
+            val updateIntent = Intent("com.bebong.timetodo.ACTION_ENTRIES_UPDATED").apply {
                 setPackage(context.packageName)
             }
             context.sendBroadcast(updateIntent)
@@ -360,7 +360,7 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
 
                 updateNotification(context, force = true)
 
-                val updateIntent = Intent("com.example.todonow.ACTION_ENTRIES_UPDATED").apply {
+                val updateIntent = Intent("com.bebong.timetodo.ACTION_ENTRIES_UPDATED").apply {
                     setPackage(context.packageName)
                 }
                 context.sendBroadcast(updateIntent)

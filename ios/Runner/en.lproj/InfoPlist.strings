@@ -1,0 +1,7 @@
+/* English (Default / Global) */
+"CFBundleDisplayName" = "TimeTodo";
+"NSCameraUsageDescription" = "Camera access is needed to capture photos with timestamp stamps.";
+"NSMicrophoneUsageDescription" = "Microphone access is needed for camera functionality.";
+"NSPhotoLibraryUsageDescription" = "Photo library access is needed to view and manage your timestamp photos.";
+"NSPhotoLibraryAddUsageDescription" = "Permission is needed to save timestamp photos to your photo library.";
+

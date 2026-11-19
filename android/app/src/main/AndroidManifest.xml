@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" tools:replace="android:maxSdkVersion" />
     <application
-        android:label="todonow"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/LaunchTheme">
@@ -31,10 +31,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- Google AdMob Application ID (테스트용 샘플 ID) -->
+        <!-- Google AdMob Application ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-6846113246046890~6608711655"/>
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -46,8 +46,8 @@
             android:name=".LockScreenNotificationReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.example.todonow.ACTION_ADD_TODO" />
-                <action android:name="com.example.todonow.ACTION_COMPLETE_TODO" />
+                <action android:name="com.bebong.timetodo.ACTION_ADD_TODO" />
+                <action android:name="com.bebong.timetodo.ACTION_COMPLETE_TODO" />
             </intent-filter>
         </receiver>
     </application>

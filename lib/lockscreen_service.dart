@@ -386,7 +386,7 @@ class LockScreenNotificationService {
     // 2. 잠금화면 최우선 TODO 고정 알림 (Android에서는 완벽한 RemoteInput 응답을 위해 네이티브 채널 호출)
     if (Platform.isAndroid) {
       try {
-        const platform = MethodChannel('com.example.todonow/lockscreen');
+        const platform = MethodChannel('com.bebong.timetodo/lockscreen');
         if (enabled) {
           await platform.invokeMethod('updateLockScreenTodo');
         } else {
@@ -572,7 +572,7 @@ class LockScreenNotificationService {
   Future<void> clearTopTodo() async {
     if (Platform.isAndroid) {
       try {
-        const platform = MethodChannel('com.example.todonow/lockscreen');
+        const platform = MethodChannel('com.bebong.timetodo/lockscreen');
         await platform.invokeMethod('clearLockScreenTodo');
       } catch (_) {}
     }

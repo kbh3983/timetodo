@@ -447,14 +447,14 @@ class _CameraPageState extends State<CameraPage> with WidgetsBindingObserver {
     final tempDir = await getTemporaryDirectory();
     final outPath = path.join(
       tempDir.path,
-      'todonow_${DateTime.now().millisecondsSinceEpoch}.png',
+      'timetodo_${DateTime.now().millisecondsSinceEpoch}.png',
     );
     final outFile = File(outPath);
     await outFile.writeAsBytes(byteData!.buffer.asUint8List());
 
-    // 5. timenow와 동일하게 기기 앨범(갤러리)에 비동기 저장 (화면 복귀 지연 방지)
+    // 5. 기기 앨범(갤러리)에 비동기 저장 (화면 복귀 지연 방지)
     unawaited(
-      Gal.putImage(outPath, album: 'todonow').catchError((e) {
+      Gal.putImage(outPath, album: 'TimeTodo').catchError((e) {
         debugPrint('Failed to save to gallery album: $e');
         return Gal.putImage(outPath).catchError((e2) {
           debugPrint('Fallback gallery save failed: $e2');

@@ -15,11 +15,14 @@ import 'package:path/path.dart' as path;
 import 'camera_page.dart';
 import 'lockscreen_service.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_strings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await initializeDateFormatting('ko', null);
+    await initializeDateFormatting('en', null);
   } catch (_) {}
   await ThemeController.instance.init();
   await LockScreenNotificationService.instance.init();
@@ -37,7 +40,7 @@ void main() async {
 const bool kIsProVersion = false;
 
 /// 유료 Pro 버전 스토어 링크 (설정에서 연결될 URL)
-const String kProAppStoreUrl = 'https://play.google.com/store/apps/details?id=com.example.todonow.pro';
+const String kProAppStoreUrl = 'https://play.google.com/store/apps/details?id=com.bebong.timetodo.pro';
 
 class AppTheme {
   final String id;
@@ -251,8 +254,17 @@ class ChronosApp extends StatelessWidget {
         final theme = ThemeController.instance.currentTheme;
         final isDark = theme.isDark;
         return MaterialApp(
-          title: 'Chronos Timestamp',
+          title: 'TimeTodo',
           debugShowCheckedModeBanner: false,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en'),
+            Locale('ko'),
+          ],
           theme: ThemeData(
             useMaterial3: true,
             brightness: isDark ? Brightness.dark : Brightness.light,
@@ -286,7 +298,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
   final GlobalKey<_HomePageState> _homePageKey = GlobalKey<_HomePageState>();
   int _selectedIndex = 0;
   List<TimestampEntry> _entries = [];
-  double _uiScale = 0.9; // Default to 0.9 for a smaller, cleaner look
+  double _uiScale = 1.0; // Default to 1.0 ('보통')
   late ValueNotifier<List<TimestampEntry>> _entriesNotifier;
   final ImagePicker _picker = ImagePicker();
 
@@ -317,7 +329,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
 
     // 잠금화면 알림 실시간 동기화 브로드캐스트 수신
     if (Platform.isAndroid) {
-      const platform = MethodChannel('com.example.todonow/lockscreen');
+      const platform = MethodChannel('com.bebong.timetodo/lockscreen');
       platform.setMethodCallHandler((call) async {
         if (call.method == 'onEntriesUpdatedExternally') {
           if (mounted) {
@@ -497,7 +509,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
   Future<void> _loadUiScale() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _uiScale = prefs.getDouble('ui_scale') ?? 0.9;
+      _uiScale = prefs.getDouble('ui_scale') ?? 1.0;
     });
   }
 
@@ -523,6 +535,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
             return StatefulBuilder(
               builder: (context, setSheetState) {
                 final currentTheme = ThemeController.instance.currentTheme;
+                final strings = AppStrings.of(context);
                 final isDark = currentTheme.isDark;
                 final bottomPadding = MediaQuery.of(context).padding.bottom;
 
@@ -726,7 +739,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                               Row(
                                                 children: [
                                                   Text(
-                                                    'TodoNow Pro',
+                                                    'TimeTodo Pro',
                                                     style: GoogleFonts.inter(
                                                       fontSize: 15,
                                                       fontWeight: FontWeight.w800,
@@ -1175,7 +1188,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                               // ------------------------------------------
                               // 4. 지원 및 정보
                               // ------------------------------------------
-                              buildSectionHeader('지원 및 정보'),
+                              buildSectionHeader(strings.settingsSupport),
                               buildGroupCard(
                                 children: [
                                   InkWell(
@@ -1195,7 +1208,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Text(
-                                              '개발자 토닥토닥 응원하기',
+                                              strings.cheerDeveloperTitle,
                                               style: GoogleFonts.inter(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
@@ -1224,7 +1237,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            '버전',
+                                            strings.settingsVersion,
                                             style: GoogleFonts.inter(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
@@ -1336,7 +1349,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                 const SizedBox(height: 14),
                 Center(
                   child: Text(
-                    'TodoNow Pro',
+                    'TimeTodo Pro',
                     style: GoogleFonts.inter(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
@@ -1387,7 +1400,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                       ScaffoldMessenger.of(parentContext).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'TodoNow Pro(광고 제거 버전)가 곧 출시될 예정입니다! 기대해 주세요 🚀',
+                            'TimeTodo Pro(광고 제거 버전)가 곧 출시될 예정입니다! 기대해 주세요 🚀',
                             style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                           ),
                           backgroundColor: const Color(0xFFF59E0B),
@@ -1475,6 +1488,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
     final theme = ThemeController.instance.currentTheme;
     final isDark = theme.isDark;
     final targetContext = mounted ? this.context : sheetContext;
+    final strings = AppStrings.of(targetContext);
 
     showModalBottomSheet(
       context: targetContext,
@@ -1527,7 +1541,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
 
                 // Title
                 Text(
-                  '따뜻한 응원 감사해요!',
+                  strings.cheerThankYouTitle,
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -1540,7 +1554,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
 
                 // Subtitle
                 Text(
-                  '보내주신 소중한 응원,\n더 좋은 앱으로 보답할게요',
+                  strings.cheerThankYouSubtitle,
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -2467,6 +2481,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
   }
 
   Widget _buildIosBottomNav(BuildContext context, AppTheme currentTheme) {
+    final strings = AppStrings.of(context);
     final isDark = currentTheme.isDark;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
@@ -2513,7 +2528,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                         // 좌측 1: 타임라인
                         _buildNavItem(
                           icon: Icons.schedule_rounded,
-                          label: '타임라인',
+                          label: strings.navTimeline,
                           isSelected: _selectedIndex == 0,
                           accentColor: effectiveAccent,
                           isDark: isDark,
@@ -2525,7 +2540,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                         // 좌측 2: 카테고리
                         _buildNavItem(
                           icon: Icons.grid_view_rounded,
-                          label: '카테고리',
+                          label: strings.navCategory,
                           isSelected: _selectedIndex == 1,
                           accentColor: effectiveAccent,
                           isDark: isDark,
@@ -2539,7 +2554,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                         // 우측 1: 인사이트
                         _buildNavItem(
                           icon: Icons.insights_rounded,
-                          label: '인사이트',
+                          label: strings.tabInsights,
                           isSelected: _selectedIndex == 2,
                           accentColor: effectiveAccent,
                           isDark: isDark,
@@ -2551,7 +2566,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                         // 우측 2: 설정
                         _buildNavItem(
                           icon: Icons.tune_rounded,
-                          label: '설정',
+                          label: strings.tabSettings,
                           isSelected: false,
                           accentColor: effectiveAccent,
                           isDark: isDark,
@@ -4613,19 +4628,15 @@ void showAddCategoryModal(
 
 class AdHelper {
   static String get bannerAdUnitId {
-    if (Platform.isAndroid) {
-      return 'ca-app-pub-3940256099942544/6300978111'; // Google Android Banner Test ID
-    } else if (Platform.isIOS) {
-      return 'ca-app-pub-3940256099942544/2934735716'; // Google iOS Banner Test ID
+    if (Platform.isAndroid || Platform.isIOS) {
+      return 'ca-app-pub-6846113246046890/2198693356';
     }
     return '';
   }
 
   static String get rewardedAdUnitId {
-    if (Platform.isAndroid) {
-      return 'ca-app-pub-3940256099942544/5224354917'; // Google Android Rewarded Test ID
-    } else if (Platform.isIOS) {
-      return 'ca-app-pub-3940256099942544/1712485313'; // Google iOS Rewarded Test ID
+    if (Platform.isAndroid || Platform.isIOS) {
+      return 'ca-app-pub-6846113246046890/2863414473';
     }
     return '';
   }
@@ -4743,6 +4754,7 @@ class _HomePageState extends State<HomePage> {
   DateTime? _targetDate;
   bool _showOnlyTodo = false;
   bool _showSwipeGuide = false;
+  int _displayedItemCount = 30;
 
   String _selectedCategory = 'General';
 
@@ -5554,11 +5566,28 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredEntries = _showOnlyTodo
+        ? widget.entries.where((e) => e.status == 'todo').toList()
+        : widget.entries;
+    final int itemCount = filteredEntries.length.clamp(0, _displayedItemCount);
+    final bottomInset = 150.0 + MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (scrollInfo) {
+            if (scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 400) {
+              if (_displayedItemCount < filteredEntries.length) {
+                setState(() {
+                  _displayedItemCount = (_displayedItemCount + 30).clamp(0, filteredEntries.length);
+                });
+              }
+            }
+            return false;
+          },
+          child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverPadding(
@@ -5632,8 +5661,10 @@ class _HomePageState extends State<HomePage> {
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _showOnlyTodo = !_showOnlyTodo),
+                    onTap: () => setState(() {
+                      _showOnlyTodo = !_showOnlyTodo;
+                      _displayedItemCount = 30;
+                    }),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(
@@ -5796,20 +5827,13 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               )
-            else
+            else ...[
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 100.0),
+                padding: EdgeInsets.fromLTRB(16.0, 0, 16.0, bottomInset),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final filteredEntries = _showOnlyTodo
-                          ? widget.entries
-                                .where((e) => e.status == 'todo')
-                                .toList()
-                          : widget.entries;
-
-                      if (index >= filteredEntries.length) return null;
-
+                      if (index >= itemCount) return null;
                       final entry = filteredEntries[index];
                       return TimestampListItem(
                         entry: entry,
@@ -5822,16 +5846,16 @@ class _HomePageState extends State<HomePage> {
                         uiScale: widget.uiScale,
                       );
                     },
-                    childCount: _showOnlyTodo
-                        ? widget.entries.where((e) => e.status == 'todo').length
-                        : widget.entries.length,
+                    childCount: itemCount,
                   ),
                 ),
               ),
+            ],
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -8700,8 +8724,9 @@ class _CategoryViewState extends State<CategoryView> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -8895,85 +8920,110 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
           ),
         ],
       ),
-      body: ValueListenableBuilder<List<TimestampEntry>>(
-        valueListenable: widget.entriesNotifier,
-        builder: (context, currentEntries, _) {
-          final categoryEntries = currentEntries
-              .where((e) => e.category == _currentCategory)
-              .toList();
+      body: SafeArea(
+        top: false,
+        child: ValueListenableBuilder<List<TimestampEntry>>(
+          valueListenable: widget.entriesNotifier,
+          builder: (context, currentEntries, _) {
+            final categoryEntries = currentEntries
+                .where((e) => e.category == _currentCategory)
+                .toList();
 
-          final filteredEntries = _showOnlyTodo
-              ? categoryEntries.where((e) => e.status == 'todo').toList()
-              : categoryEntries;
+            final filteredEntries = _showOnlyTodo
+                ? categoryEntries.where((e) => e.status == 'todo').toList()
+                : categoryEntries;
 
-          if (categoryEntries.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.history_toggle_off_rounded,
-                    size: 48,
-                    color: appTextTertiary.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '이 카테고리에 기록이 없습니다',
-                    style: GoogleFonts.inter(
-                      color: appTextTertiary,
-                      fontSize: 15,
+            final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+            return CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // 최상단 배너 광고 (스크롤 시 함께 자연스럽게 이동)
+                if (!kIsProVersion)
+                  const SliverToBoxAdapter(
+                    child: TopBannerAdWidget(
+                      margin: EdgeInsets.fromLTRB(16, 4, 16, 8),
                     ),
                   ),
-                ],
-              ),
-            );
-          }
 
-          if (filteredEntries.isEmpty && _showOnlyTodo) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.filter_list_off_rounded,
-                    size: 48,
-                    color: appTextTertiary.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '이 카테고리에 진행 중인 TODO가 없습니다',
-                    style: GoogleFonts.inter(
-                      color: appTextTertiary,
-                      fontSize: 15,
+                if (categoryEntries.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.history_toggle_off_rounded,
+                            size: 48,
+                            color: appTextTertiary.withOpacity(0.5),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '이 카테고리에 기록이 없습니다',
+                            style: GoogleFonts.inter(
+                              color: appTextTertiary,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (filteredEntries.isEmpty && _showOnlyTodo)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.filter_list_off_rounded,
+                            size: 48,
+                            color: appTextTertiary.withOpacity(0.5),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '이 카테고리에 진행 중인 TODO가 없습니다',
+                            style: GoogleFonts.inter(
+                              color: appTextTertiary,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 48 + bottomPadding),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final entry = filteredEntries[index];
+                          return TimestampListItem(
+                            key: ValueKey('${entry.id}_$_isAllExpanded'),
+                            entry: entry,
+                            categoryColor: _effectiveColor,
+                            onDelete: () => widget.onDelete(entry.id),
+                            onStatusToggle: () => widget.onToggle(entry.id),
+                            onUpdate: widget.onUpdateEntry,
+                            categories: widget.categories,
+                            getCategoryColor: (cat) =>
+                                widget.categoryColors?[cat] ??
+                                (cat == _currentCategory ? _effectiveColor : widget.categoryColor),
+                            uiScale: widget.uiScale,
+                            initialExpanded: _isAllExpanded,
+                          );
+                        },
+                        childCount: filteredEntries.length,
+                      ),
                     ),
                   ),
-                ],
-              ),
+              ],
             );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            itemCount: filteredEntries.length,
-            itemBuilder: (context, index) {
-              final entry = filteredEntries[index];
-              return TimestampListItem(
-                key: ValueKey('${entry.id}_$_isAllExpanded'),
-                entry: entry,
-                categoryColor: _effectiveColor,
-                onDelete: () => widget.onDelete(entry.id),
-                onStatusToggle: () => widget.onToggle(entry.id),
-                onUpdate: widget.onUpdateEntry,
-                categories: widget.categories,
-                getCategoryColor: (cat) =>
-                    widget.categoryColors?[cat] ??
-                    (cat == _currentCategory ? _effectiveColor : widget.categoryColor),
-                uiScale: widget.uiScale,
-                initialExpanded: _isAllExpanded,
-              );
-            },
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -9807,11 +9857,13 @@ class _InsightViewState extends State<InsightView> {
     Widget? child,
     IconData? icon,
     Widget? headerTrailing,
+    EdgeInsetsGeometry? padding,
+    EdgeInsetsGeometry? margin,
   }) {
     final effectiveContent = content ?? child ?? const SizedBox.shrink();
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(20),
+      margin: margin ?? const EdgeInsets.only(bottom: 20),
+      padding: padding ?? const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: appCardBg,
         borderRadius: BorderRadius.circular(28),
@@ -9884,7 +9936,7 @@ class _InsightViewState extends State<InsightView> {
     final accentColor = _selectedGlobalCategory == 'All'
         ? themeAccent
         : _getCategoryColor(_selectedGlobalCategory);
-    final effectiveMetricType = (totalTimeMinutes > 0) ? _whereMetricType : 'count';
+    final effectiveMetricType = _whereMetricType;
 
     return _buildSectionCard(
       title: '시간 사용 통계',
@@ -10010,6 +10062,7 @@ class _InsightViewState extends State<InsightView> {
                   Expanded(
                     child: GestureDetector(
                       onTap: () {
+                        HapticFeedback.selectionClick();
                         if (_whereMetricType != 'count') {
                           setState(() => _whereMetricType = 'count');
                         }
@@ -10057,6 +10110,7 @@ class _InsightViewState extends State<InsightView> {
                   Expanded(
                     child: GestureDetector(
                       onTap: () {
+                        HapticFeedback.selectionClick();
                         if (_whereMetricType != 'time') {
                           setState(() => _whereMetricType = 'time');
                         }
@@ -10104,25 +10158,53 @@ class _InsightViewState extends State<InsightView> {
                 ],
               ),
             ),
-            if (totalTimeMinutes == 0) ...[
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  '※ 소요 시간이 입력된 기록이 없어 건수 기준으로 표시됩니다.',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: appTextTertiary,
-                  ),
+            if (effectiveMetricType == 'time' && totalTimeMinutes == 0) ...[
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: appSubtleBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: appBorder),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.hourglass_empty_rounded,
+                      size: 34,
+                      color: appTextTertiary.withOpacity(0.6),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '기록된 소요 시간이 없습니다',
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: appText,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'TODO를 완료하거나 소요 시간을 입력하면\n카테고리별 시간 점유율이 자동으로 분석됩니다.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: appTextSecondary,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  effectiveMetricType == 'time' ? '카테고리별 시간 점유율' : '카테고리별 건수 점유율',
+            ] else ...[
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    effectiveMetricType == 'time' ? '카테고리별 시간 점유율' : '카테고리별 건수 점유율',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
@@ -10183,7 +10265,8 @@ class _InsightViewState extends State<InsightView> {
                 color: catColor,
               );
             }),
-          ] else ...[
+          ],
+        ] else ...[
             const SizedBox(height: 24),
             Center(
               child: Padding(
@@ -11116,21 +11199,22 @@ class _InsightViewState extends State<InsightView> {
                     ),
                     Container(height: 1, color: appBorder),
 
-                    // Entries List - 100% Home TimestampListItem style with full images
+                    // Entries List - Dynamic compact height for 0 or few items, scrollable when many
                     Flexible(
                       child: matchedEntries.isEmpty
                           ? Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
-                              child: Center(
+                              padding: EdgeInsets.fromLTRB(20, 36, 20, effectiveBottom + 16),
+                              child: SizedBox(
+                                width: double.infinity,
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
                                       Icons.hourglass_empty_rounded,
-                                      size: 40,
+                                      size: 38,
                                       color: appTextTertiary.withOpacity(0.4),
                                     ),
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 10),
                                     Text(
                                       '기록된 활동이 없습니다',
                                       style: GoogleFonts.inter(
@@ -11143,8 +11227,9 @@ class _InsightViewState extends State<InsightView> {
                               ),
                             )
                           : ListView.builder(
+                              shrinkWrap: true,
                               physics: const BouncingScrollPhysics(),
-                              padding: EdgeInsets.fromLTRB(16, 14, 16, effectiveBottom),
+                              padding: EdgeInsets.fromLTRB(16, 14, 16, effectiveBottom + 20),
                               itemCount: matchedEntries.length,
                               itemBuilder: (context, index) {
                                 final entry = matchedEntries[index];
@@ -12004,6 +12089,7 @@ class _InsightViewState extends State<InsightView> {
       title: '활동 캘린더',
       subtitle: '월별 활동 일관성 및 날짜별 상세 기록을 확인합니다',
       icon: Icons.calendar_month_rounded,
+      padding: const EdgeInsets.all(20),
       selector: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -12061,7 +12147,7 @@ class _InsightViewState extends State<InsightView> {
         children: [
           // Monthly Summary Banner (iOS Style)
           Container(
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             decoration: BoxDecoration(
               color: appSubtleBg,
@@ -12138,6 +12224,7 @@ class _InsightViewState extends State<InsightView> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
+        bottom: false,
         child: ValueListenableBuilder<List<TimestampEntry>>(
           valueListenable: widget.entriesNotifier,
           builder: (context, entries, _) {
@@ -12277,51 +12364,57 @@ class _InsightViewState extends State<InsightView> {
       0,
     );
     final daysInMonth = lastDayOfMonth.day;
-    final startWeekday = firstDayOfMonth.weekday;
+    // Sunday is 0, Monday is 1, ..., Saturday is 6
+    final startWeekday = firstDayOfMonth.weekday % 7;
+    final totalSlots = startWeekday + daysInMonth;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: appSubtleBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: appBorder),
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: ['월', '화', '수', '목', '금', '토', '일'].map((day) {
-                  return Expanded(
-                    child: Center(
-                      child: Text(
-                        day,
-                        style: GoogleFonts.inter(
-                          color: appTextTertiary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
+      decoration: BoxDecoration(
+        color: appSubtleBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: appBorder),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: ['일', '월', '화', '수', '목', '금', '토'].map((day) {
+              final isSun = day == '일';
+              final isSat = day == '토';
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    day,
+                    style: GoogleFonts.inter(
+                      color: isSun
+                          ? const Color(0xFFEF4444).withOpacity(0.85)
+                          : (isSat
+                              ? const Color(0xFF3B82F6).withOpacity(0.85)
+                              : appTextTertiary),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
+                  ),
                 ),
-                itemCount: 42,
-                itemBuilder: (context, index) {
-                  final dayOffset = index - (startWeekday - 1);
-                  if (dayOffset < 0 || dayOffset >= daysInMonth) {
-                    return const SizedBox.shrink();
-                  }
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+            ),
+            itemCount: totalSlots,
+            itemBuilder: (context, index) {
+              final dayOffset = index - startWeekday;
+              if (dayOffset < 0 || dayOffset >= daysInMonth) {
+                return const SizedBox.shrink();
+              }
 
                   final day = dayOffset + 1;
                   final currentDayDate = DateTime(
@@ -12459,9 +12552,7 @@ class _InsightViewState extends State<InsightView> {
               ),
             ],
           ),
-        ),
-      ],
-    );
+        );
   }
 
   Color _getAdjustedColor(
@@ -12645,7 +12736,7 @@ class _InsightViewState extends State<InsightView> {
 
     final bool hasTimeData = totalDuration > 0;
     final int totalCount = entries.length;
-    final String effectiveMetricType = (metricType == 'time' && hasTimeData) ? 'time' : 'count';
+    final String effectiveMetricType = metricType;
 
     final result = <String, Map<String, dynamic>>{};
     for (var entry in counts.entries) {
