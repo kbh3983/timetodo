@@ -15,6 +15,7 @@ import 'package:path/path.dart' as path;
 import 'camera_page.dart';
 import 'lockscreen_service.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_strings.dart';
 
@@ -8852,6 +8853,8 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
   bool _showOnlyTodo = false;
   late String _currentCategory;
   bool _isAllExpanded = true; // 기본으로 펼쳐보기
+  bool _isSelectionMode = false; // 선택 공유 모드
+  Set<String> _selectedEntryIds = <String>{};
 
   Color get _effectiveColor =>
       widget.categoryColors?[_currentCategory] ?? widget.categoryColor;
@@ -8871,160 +8874,462 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
     super.dispose();
   }
 
+  Future<void> _shareSelectedEntries(List<TimestampEntry> allEntries) async {
+    final selectedEntries = allEntries
+        .where((e) => _selectedEntryIds.contains(e.id))
+        .toList();
+    if (selectedEntries.isEmpty) return;
+
+    // 날짜/시간 순서(오름차순) 정렬
+    selectedEntries.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    final sb = StringBuffer();
+    sb.writeln('[$_currentCategory] 기록 (총 ${selectedEntries.length}건)');
+    sb.writeln();
+
+    final dateFormat = DateFormat('yyyy.MM.dd HH:mm');
+    for (int i = 0; i < selectedEntries.length; i++) {
+      final e = selectedEntries[i];
+      final timeStr = dateFormat.format(e.timestamp);
+      final isDone = e.status == 'done';
+      final statusBadge = isDone
+          ? '✅ [완료]'
+          : (e.status == 'todo' ? '⏳ [TODO]' : '📌 [기록]');
+
+      sb.writeln('${i + 1}. $statusBadge $timeStr');
+      if (e.note.trim().isNotEmpty) {
+        sb.writeln('   ${e.note.trim()}');
+      }
+      if (isDone && e.doneNote != null && e.doneNote!.trim().isNotEmpty) {
+        sb.writeln('   • 완료 메모: ${e.doneNote!.trim()}');
+      }
+      if (e.effectiveDurationMinutes > 0) {
+        sb.writeln('   • 소요 시간: ${e.effectiveDurationMinutes}분');
+      }
+      if (e.targetDate != null) {
+        sb.writeln('   • 목표 기한: ${dateFormat.format(e.targetDate!)}');
+      }
+      if (i < selectedEntries.length - 1) {
+        sb.writeln();
+      }
+    }
+
+    final shareText = sb.toString().trim();
+
+    final List<XFile> imageFiles = [];
+    for (final e in selectedEntries) {
+      if (e.imagePath != null && e.imagePath!.isNotEmpty) {
+        final f = File(e.imagePath!);
+        if (f.existsSync()) {
+          imageFiles.add(XFile(f.path));
+        }
+      }
+      if (e.doneImagePath != null && e.doneImagePath!.isNotEmpty) {
+        final f = File(e.doneImagePath!);
+        if (f.existsSync()) {
+          imageFiles.add(XFile(f.path));
+        }
+      }
+    }
+
+    try {
+      if (imageFiles.isNotEmpty) {
+        // 일부 메신저(메시지, 카카오톡 등)가 사진 첨부 시 텍스트를 누락시키는 플랫폼 제약 대비 클립보드 자동 복사
+        await Clipboard.setData(ClipboardData(text: shareText));
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📋 글 내용이 클립보드에 복사되었습니다. (사진만 전송될 경우 붙여넣기 하세요)'),
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+
+        await Share.shareXFiles(
+          imageFiles,
+          text: shareText,
+        );
+      } else {
+        await Share.share(shareText);
+      }
+    } catch (err) {
+      debugPrint('Share error: $err');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('공유 중 오류가 발생했습니다: $err'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, size: 20, color: appText),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          _currentCategory,
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w800,
-            fontSize: 18 * widget.uiScale,
-            color: appText,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () => setState(() => _isAllExpanded = !_isAllExpanded),
-            icon: Icon(
-              _isAllExpanded
-                  ? Icons.unfold_less_rounded
-                  : Icons.unfold_more_rounded,
-              color: _effectiveColor,
-              size: 22,
-            ),
-            tooltip: _isAllExpanded ? '전체 접기' : '전체 펼치기',
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: IconButton(
-              onPressed: () => setState(() => _showOnlyTodo = !_showOnlyTodo),
-              icon: Icon(
-                _showOnlyTodo
-                    ? Icons.filter_list_rounded
-                    : Icons.filter_list_off_rounded,
-                color: _showOnlyTodo
-                    ? _effectiveColor
-                    : appTextTertiary,
-                size: 20,
-              ),
-              tooltip: _showOnlyTodo ? '전체 보기' : 'TODO 모아보기',
-            ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: ValueListenableBuilder<List<TimestampEntry>>(
-          valueListenable: widget.entriesNotifier,
-          builder: (context, currentEntries, _) {
-            final categoryEntries = currentEntries
-                .where((e) => e.category == _currentCategory)
-                .toList();
+    return ValueListenableBuilder<List<TimestampEntry>>(
+      valueListenable: widget.entriesNotifier,
+      builder: (context, currentEntries, _) {
+        final categoryEntries = currentEntries
+            .where((e) => e.category == _currentCategory)
+            .toList();
 
-            final filteredEntries = _showOnlyTodo
-                ? categoryEntries.where((e) => e.status == 'todo').toList()
-                : categoryEntries;
+        final filteredEntries = _showOnlyTodo
+            ? categoryEntries.where((e) => e.status == 'todo').toList()
+            : categoryEntries;
 
-            final bottomPadding = MediaQuery.of(context).padding.bottom;
+        final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-            return CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // 최상단 배너 광고 (스크롤 시 함께 자연스럽게 이동)
-                if (!kIsProVersion)
-                  const SliverToBoxAdapter(
-                    child: TopBannerAdWidget(
-                      margin: EdgeInsets.fromLTRB(16, 4, 16, 8),
-                    ),
-                  ),
-
-                if (categoryEntries.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.history_toggle_off_rounded,
-                            size: 48,
-                            color: appTextTertiary.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            '이 카테고리에 기록이 없습니다',
-                            style: GoogleFonts.inter(
-                              color: appTextTertiary,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (filteredEntries.isEmpty && _showOnlyTodo)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.filter_list_off_rounded,
-                            size: 48,
-                            color: appTextTertiary.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            '이 카테고리에 진행 중인 TODO가 없습니다',
-                            style: GoogleFonts.inter(
-                              color: appTextTertiary,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(16, 8, 16, 48 + bottomPadding),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final entry = filteredEntries[index];
-                          return TimestampListItem(
-                            key: ValueKey('${entry.id}_$_isAllExpanded'),
-                            entry: entry,
-                            categoryColor: _effectiveColor,
-                            onDelete: () => widget.onDelete(entry.id),
-                            onStatusToggle: () => widget.onToggle(entry.id),
-                            onUpdate: widget.onUpdateEntry,
-                            categories: widget.categories,
-                            getCategoryColor: (cat) =>
-                                widget.categoryColors?[cat] ??
-                                (cat == _currentCategory ? _effectiveColor : widget.categoryColor),
-                            uiScale: widget.uiScale,
-                            initialExpanded: _isAllExpanded,
-                          );
-                        },
-                        childCount: filteredEntries.length,
-                      ),
-                    ),
-                  ),
-              ],
-            );
+        return PopScope(
+          canPop: !_isSelectionMode,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop && _isSelectionMode) {
+              setState(() {
+                _isSelectionMode = false;
+                _selectedEntryIds.clear();
+              });
+            }
           },
-        ),
-      ),
+          child: Scaffold(
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: _isSelectionMode
+                  ? IconButton(
+                      icon: Icon(Icons.close_rounded, size: 22, color: appText),
+                      onPressed: () {
+                        setState(() {
+                          _isSelectionMode = false;
+                          _selectedEntryIds.clear();
+                        });
+                      },
+                      tooltip: '선택 취소',
+                    )
+                  : IconButton(
+                      icon: Icon(Icons.arrow_back_ios_new, size: 20, color: appText),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+              title: Text(
+                _isSelectionMode
+                    ? '${_selectedEntryIds.length}개 선택됨'
+                    : _currentCategory,
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18 * widget.uiScale,
+                  color: appText,
+                ),
+              ),
+              centerTitle: true,
+              actions: _isSelectionMode
+                  ? [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            if (_selectedEntryIds.length == filteredEntries.length) {
+                              _selectedEntryIds.clear();
+                            } else {
+                              _selectedEntryIds = filteredEntries.map((e) => e.id).toSet();
+                            }
+                          });
+                        },
+                        child: Text(
+                          _selectedEntryIds.length == filteredEntries.length ? '전체 해제' : '전체 선택',
+                          style: GoogleFonts.inter(
+                            color: _effectiveColor,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ]
+                  : [
+                      IconButton(
+                        onPressed: () => setState(() => _isAllExpanded = !_isAllExpanded),
+                        icon: Icon(
+                          _isAllExpanded
+                              ? Icons.unfold_less_rounded
+                              : Icons.unfold_more_rounded,
+                          color: _effectiveColor,
+                          size: 22,
+                        ),
+                        tooltip: _isAllExpanded ? '전체 접기' : '전체 펼치기',
+                      ),
+                      IconButton(
+                        onPressed: () => setState(() => _showOnlyTodo = !_showOnlyTodo),
+                        icon: Icon(
+                          _showOnlyTodo
+                              ? Icons.filter_list_rounded
+                              : Icons.filter_list_off_rounded,
+                          color: _showOnlyTodo
+                              ? _effectiveColor
+                              : appTextTertiary,
+                          size: 20,
+                        ),
+                        tooltip: _showOnlyTodo ? '전체 보기' : 'TODO 모아보기',
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: IconButton(
+                          onPressed: filteredEntries.isEmpty
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _isSelectionMode = true;
+                                    _selectedEntryIds.clear();
+                                  });
+                                },
+                          icon: Icon(
+                            Icons.share_rounded,
+                            color: filteredEntries.isEmpty
+                                ? appTextTertiary.withOpacity(0.4)
+                                : _effectiveColor,
+                            size: 21,
+                          ),
+                          tooltip: '기록 선택하여 공유',
+                        ),
+                      ),
+                    ],
+            ),
+            bottomNavigationBar: _isSelectionMode
+                ? Container(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomPadding),
+                    decoration: BoxDecoration(
+                      color: appCardBg,
+                      border: Border(top: BorderSide(color: appBorder)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_selectedEntryIds.length}개 선택됨',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  color: appText,
+                                ),
+                              ),
+                              Text(
+                                _selectedEntryIds.isEmpty
+                                    ? '공유할 기록을 체크하세요'
+                                    : '텍스트 및 첨부 사진 포함',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: appTextTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: _selectedEntryIds.isEmpty
+                              ? null
+                              : () => _shareSelectedEntries(filteredEntries),
+                          icon: const Icon(Icons.share_rounded, size: 18),
+                          label: Text(
+                            '공유하기',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _effectiveColor,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: appSubtleBg,
+                            disabledForegroundColor: appTextTertiary,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: _selectedEntryIds.isEmpty ? 0 : 2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : null,
+            body: SafeArea(
+              top: false,
+              bottom: !_isSelectionMode,
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  // 최상단 배너 광고 (스크롤 시 함께 자연스럽게 이동)
+                  if (!kIsProVersion)
+                    const SliverToBoxAdapter(
+                      child: TopBannerAdWidget(
+                        margin: EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      ),
+                    ),
+
+                  if (categoryEntries.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.history_toggle_off_rounded,
+                              size: 48,
+                              color: appTextTertiary.withOpacity(0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '이 카테고리에 기록이 없습니다',
+                              style: GoogleFonts.inter(
+                                color: appTextTertiary,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (filteredEntries.isEmpty && _showOnlyTodo)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.filter_list_off_rounded,
+                              size: 48,
+                              color: appTextTertiary.withOpacity(0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '이 카테고리에 진행 중인 TODO가 없습니다',
+                              style: GoogleFonts.inter(
+                                color: appTextTertiary,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(16, 8, 16, 48 + bottomPadding),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final entry = filteredEntries[index];
+                            final isSelected = _selectedEntryIds.contains(entry.id);
+
+                            final itemWidget = TimestampListItem(
+                              key: ValueKey('${entry.id}_$_isAllExpanded'),
+                              entry: entry,
+                              categoryColor: _effectiveColor,
+                              onDelete: () => widget.onDelete(entry.id),
+                              onStatusToggle: () => widget.onToggle(entry.id),
+                              onUpdate: widget.onUpdateEntry,
+                              categories: widget.categories,
+                              getCategoryColor: (cat) =>
+                                  widget.categoryColors?[cat] ??
+                                  (cat == _currentCategory ? _effectiveColor : widget.categoryColor),
+                              uiScale: widget.uiScale,
+                              initialExpanded: _isAllExpanded,
+                            );
+
+                            if (_isSelectionMode) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10.0),
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isSelected) {
+                                        _selectedEntryIds.remove(entry.id);
+                                      } else {
+                                        _selectedEntryIds.add(entry.id);
+                                      }
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? _effectiveColor
+                                            : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                      color: isSelected
+                                          ? _effectiveColor.withOpacity(0.06)
+                                          : Colors.transparent,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 10.0, right: 4.0),
+                                          child: AnimatedContainer(
+                                            duration: const Duration(milliseconds: 180),
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: isSelected
+                                                  ? _effectiveColor
+                                                  : Colors.transparent,
+                                              border: Border.all(
+                                                color: isSelected
+                                                    ? _effectiveColor
+                                                    : appTextTertiary.withOpacity(0.6),
+                                                width: 2,
+                                              ),
+                                            ),
+                                            child: isSelected
+                                                ? const Icon(
+                                                    Icons.check,
+                                                    size: 15,
+                                                    color: Colors.white,
+                                                  )
+                                                : null,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: IgnorePointer(
+                                            child: itemWidget,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            return itemWidget;
+                          },
+                          childCount: filteredEntries.length,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
