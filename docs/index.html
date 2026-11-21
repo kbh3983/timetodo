@@ -1,382 +1,853 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TimeTodo - 개인정보 처리방침 (Privacy Policy)</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-color: #0b0f19;
-            --card-bg: #131b2e;
-            --card-border: rgba(255, 255, 255, 0.08);
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent: #00d2ff;
-            --accent-glow: rgba(0, 210, 255, 0.15);
-            --code-bg: #1e293b;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TimeTodo (타임투두) - 타임스탬프 카메라 & 스마트 할 일 관리</title>
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+  <meta name="description" content="실시간 타임스탬프 카메라와 잠금화면 실시간 알림, 강력한 생산성 인사이트를 제공하는 올인원 투두 앱, TimeTodo">
+  <meta property="og:title" content="TimeTodo - Timestamp Camera & Smart Todo">
+  <meta property="og:description" content="Capture your moments with timestamps, manage daily tasks on lock screen, and track productivity insights.">
+  <meta property="og:type" content="website">
 
-        body {
-            font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            line-height: 1.7;
-            padding: 40px 20px;
-        }
+  <link rel="icon" type="image/png" href="assets/icons/app_logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 
-        .container {
-            max-width: 820px;
-            margin: 0 auto;
-        }
+  <style>
+    :root {
+      --bg-color: #0b0c0e;
+      --card-bg: rgba(26, 29, 36, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-color: #38BDF8;
+      --accent-glow: rgba(56, 189, 248, 0.35);
+      --text-main: #FFFFFF;
+      --text-sub: #9EADB8;
+      --text-dim: #64748B;
+    }
 
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-            padding-bottom: 30px;
-            border-bottom: 1px solid var(--card-border);
-        }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
 
-        .logo-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            padding: 8px 18px;
-            border-radius: 999px;
-            margin-bottom: 16px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
 
-        .logo-dot {
-            width: 10px;
-            height: 10px;
-            background-color: var(--accent);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--accent);
-        }
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
 
-        .logo-title {
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--accent);
-            letter-spacing: 0.5px;
-        }
+    /* Header */
+    header {
+      padding: 24px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
 
-        h1 {
-            font-size: 32px;
-            font-weight: 800;
-            margin-bottom: 10px;
-            letter-spacing: -0.5px;
-        }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
+    }
 
-        .meta-info {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
+    .brand img {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
 
-        .lang-switch {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            margin-top: 24px;
-        }
+    .brand-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
 
-        .lang-btn {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            color: var(--text-secondary);
-            padding: 8px 18px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
+    .brand-badge {
+      background: var(--accent-color);
+      color: #000;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 12px;
+    }
 
-        .lang-btn.active {
-            background: var(--accent);
-            color: #000;
-            border-color: var(--accent);
-            box-shadow: 0 0 16px var(--accent-glow);
-        }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
 
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 28px;
-            margin-bottom: 24px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-        }
+    .header-subtitle {
+      font-size: 14px;
+      color: var(--text-sub);
+    }
 
-        h2 {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+    .header-nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-color);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 10px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
 
-        h2::before {
-            content: "";
-            display: inline-block;
-            width: 4px;
-            height: 18px;
-            background: var(--accent);
-            border-radius: 2px;
-        }
+    .header-nav-link:hover {
+      background: rgba(56, 189, 248, 0.18);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+    }
 
-        p {
-            color: var(--text-secondary);
-            margin-bottom: 14px;
-            font-size: 15px;
-        }
+    .lang-switcher {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
 
-        p:last-child {
-            margin-bottom: 0;
-        }
+    .lang-select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: rgba(26, 29, 36, 0.9);
+      color: var(--text-main);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 8px;
+      padding: 8px 30px 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
 
-        ul {
-            list-style: none;
-            padding: 0;
-            margin-bottom: 14px;
-        }
+    .lang-select:hover,
+    .lang-select:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+    }
 
-        li {
-            position: relative;
-            padding-left: 20px;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            font-size: 15px;
-        }
+    .lang-select option {
+      background: #14171d;
+      color: #ffffff;
+    }
 
-        li::before {
-            content: "•";
-            position: absolute;
-            left: 6px;
-            color: var(--accent);
-            font-weight: bold;
-        }
+    .lang-arrow {
+      position: absolute;
+      right: 10px;
+      pointer-events: none;
+      color: var(--accent-color);
+      font-size: 11px;
+    }
 
-        strong {
-            color: var(--text-primary);
-        }
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 80px 0 60px;
+      position: relative;
+    }
 
-        a {
-            color: var(--accent);
-            text-decoration: none;
-            word-break: break-all;
-        }
+    .hero-glow {
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, rgba(0, 0, 0, 0) 70%);
+      z-index: -1;
+      pointer-events: none;
+    }
 
-        a:hover {
-            text-decoration: underline;
-        }
+    .hero-badge {
+      display: inline-block;
+      padding: 6px 16px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent-color);
+      border-radius: 20px;
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      letter-spacing: 0.5px;
+    }
 
-        .highlight-box {
-            background: rgba(0, 210, 255, 0.05);
-            border: 1px solid rgba(0, 210, 255, 0.2);
-            border-radius: 14px;
-            padding: 16px;
-            margin-top: 14px;
-        }
+    .hero-title {
+      font-size: 46px;
+      font-weight: 800;
+      line-height: 1.25;
+      letter-spacing: -1.5px;
+      margin-bottom: 20px;
+    }
 
-        footer {
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 13px;
-            margin-top: 50px;
-            padding-top: 24px;
-            border-top: 1px solid var(--card-border);
-        }
+    .hero-title span {
+      color: var(--accent-color);
+    }
 
-        .content-section {
-            display: none;
-        }
+    .hero-desc {
+      font-size: 18px;
+      color: var(--text-sub);
+      max-width: 660px;
+      margin: 0 auto 36px;
+      word-break: keep-all;
+    }
 
-        .content-section.active {
-            display: block;
-        }
-    </style>
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent-color);
+      color: #000000;
+      font-weight: 800;
+      font-size: 16px;
+      padding: 14px 28px;
+      border-radius: 14px;
+      text-decoration: none;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      font-weight: 700;
+      font-size: 16px;
+      padding: 14px 28px;
+      border-radius: 14px;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Features Section */
+    .features-section {
+      padding: 40px 0 80px;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .section-title {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+    }
+
+    .section-desc {
+      color: var(--text-sub);
+      font-size: 16px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 30px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+
+    .feature-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--text-main);
+    }
+
+    .feature-desc {
+      font-size: 14.5px;
+      color: var(--text-sub);
+      line-height: 1.6;
+    }
+
+    /* Info Section */
+    .info-section {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 40px;
+      margin-bottom: 80px;
+    }
+
+    .info-header {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      color: var(--text-main);
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+    }
+
+    .info-item h4 {
+      font-size: 13px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .info-item p {
+      font-size: 15px;
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    .info-item a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    .info-item a:hover {
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 40px 0;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 14px;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      color: var(--text-sub);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--accent-color);
+    }
+
+    @media (max-width: 768px) {
+      .hero-title {
+        font-size: 34px;
+      }
+      .hero-desc {
+        font-size: 16px;
+      }
+      .info-section {
+        padding: 24px;
+      }
+    }
+  </style>
 </head>
+
 <body>
-    <div class="container">
-        <header>
-            <div class="logo-badge">
-                <span class="logo-dot"></span>
-                <span class="logo-title">TIMETODO</span>
-            </div>
-            <h1 id="page-title">개인정보 처리방침</h1>
-            <p class="meta-info" id="page-subtitle">최종 수정일: 2026년 11월 19일 | 시행일자: 2026년 11월 19일</p>
-            <div class="lang-switch">
-                <button class="lang-btn active" onclick="setLang('ko')">🇰🇷 한국어</button>
-                <button class="lang-btn" onclick="setLang('en')">🇺🇸 English</button>
-            </div>
-        </header>
+  <div class="container">
+    <header>
+      <a href="./" class="brand">
+        <img src="assets/icons/app_logo.png" alt="TimeTodo Logo" onerror="this.style.display='none'">
+        <span class="brand-title">TimeTodo</span>
+        <span class="brand-badge">APP</span>
+      </a>
 
-        <!-- ==================== KOREAN SECTION ==================== -->
-        <div id="section-ko" class="content-section active">
-            <div class="card">
-                <h2>1. 개요 및 기본 원칙</h2>
-                <p><strong>TimeTodo</strong>(이하 "앱")는 사용자의 소중한 개인정보를 중요하게 생각하며, 「개인정보 보호법」 및 관련 법령을 준수합니다.</p>
-                <p>본 앱은 원칙적으로 <strong>회원가입이 필요 없으며, 별도의 외부 데이터베이스 서버를 운영하지 않습니다.</strong> 사용자가 생성하는 모든 할 일(TODO), 타임스탬프 기록, 카테고리 데이터는 사용자의 스마트폰 로컬 저장소에만 안전하게 보관됩니다.</p>
-            </div>
+      <div class="header-right">
+        <a href="privacy.html" class="header-nav-link" id="headerPrivacyLink">🛡️ 개인정보 처리방침</a>
 
-            <div class="card">
-                <h2>2. 수집하는 정보 및 이용 목적</h2>
-                <p>앱은 서비스 제공을 위해 최소한의 기능만을 로컬에서 처리하며, 사용자를 식별할 수 있는 개인정보를 직접 수집하여 서버로 전송하지 않습니다.</p>
-                <ul>
-                    <li><strong>할 일 및 타임스탬프 기록:</strong> 사용자 본인의 일정 관리 및 분석 통계를 위해 기기 내부에만 암호화/저장됩니다.</li>
-                    <li><strong>기기 권한별 이용 목적:</strong>
-                        <div class="highlight-box">
-                            <ul>
-                                <li><strong>카메라 권한 (선택):</strong> 타임스탬프가 각인된 사진을 직접 촬영하기 위해서만 사용됩니다.</li>
-                                <li><strong>사진 및 보관함(갤러리) 권한 (선택):</strong> 촬영된 타임스탬프 사진을 기기 앨범에 저장하거나 기존 사진을 불러오기 위해 사용됩니다.</li>
-                                <li><strong>알림 권한 (선택):</strong> 잠금화면 최우선 TODO 확인 및 마감 알림을 사용자 기기에 로컬로 표시하기 위해 사용됩니다.</li>
-                            </ul>
-                        </div>
-                    </li>
-                </ul>
-            </div>
+        <div class="lang-switcher">
+          <select id="langSelect" class="lang-select" aria-label="Select Language">
+            <option value="ko">한국어 (Korean)</option>
+            <option value="en">English</option>
+            <option value="ja">日本語 (Japanese)</option>
+            <option value="zh">简体中文 (Chinese)</option>
+            <option value="es">Español (Spanish)</option>
+            <option value="fr">Français (French)</option>
+            <option value="de">Deutsch (German)</option>
+          </select>
+          <span class="lang-arrow">▼</span>
+        </div>
+      </div>
+    </header>
 
-            <div class="card">
-                <h2>3. 제3자 서비스 및 광고 라이브러리</h2>
-                <p>본 앱은 무료 버전의 지속적인 유지보수 및 서비스 제공을 위해 구글(Google LLC)의 <strong>Google AdMob</strong> 광고 서비스를 탑재하고 있습니다.</p>
-                <p>Google AdMob은 맞춤형/비맞춤형 광고 게재 및 광고 효율성 분석을 위해 다음과 같은 비식별 정보를 자동으로 수집 및 처리할 수 있습니다:</p>
-                <ul>
-                    <li>광고 식별자 (Google Advertising ID / IDFA)</li>
-                    <li>기기 정보 (기기 모델, OS 버전, 언어 설정 등)</li>
-                    <li>광고 상호작용 데이터 및 진단 정보</li>
-                </ul>
-                <p>AdMob에서 수집하는 데이터에 대한 자세한 처리 기준은 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google 개인정보처리방침</a>을 참조하시기 바랍니다.</p>
-            </div>
+    <main>
+      <section class="hero">
+        <div class="hero-glow"></div>
+        <div class="hero-badge" id="heroTag">⏰ 타임스탬프 & 스마트 할 일 관리</div>
+        <h1 class="hero-title" id="heroTitle">순간을 기록하고,<br><span>오늘의 할 일</span>을 완벽하게</h1>
+        <p class="hero-desc" id="heroDesc">실시간 시각이 각인되는 타임스탬프 카메라와 잠금화면 알림, 그리고 24시간 활동 패턴 분석으로 당신의 일상을 더욱 스마트하게 관리하세요.</p>
+        <div class="hero-actions">
+          <button class="btn-primary" id="heroBtn">앱 다운로드 (Google Play)</button>
+          <a href="privacy.html" class="btn-secondary" id="heroPrivacyBtn">개인정보 처리방침 보기</a>
+        </div>
+      </section>
 
-            <div class="card">
-                <h2>4. 개인정보의 보관 및 파기</h2>
-                <p>사용자의 모든 데이터는 기기 내부 로컬 저장소(SharedPreferences 등)에 저장되며, 개발자는 이에 접근할 수 없습니다.</p>
-                <ul>
-                    <li>사용자는 앱 내에서 개별 할 일, 카테고리, 기록을 직접 즉시 삭제할 수 있습니다.</li>
-                    <li>스마트폰에서 <strong>앱을 삭제(제거)</strong>하거나 <strong>앱 데이터/캐시 삭제</strong>를 진행할 경우 모든 로컬 저장 데이터는 복구 불가능하게 영구 파기됩니다.</li>
-                </ul>
-            </div>
-
-            <div class="card">
-                <h2>5. 아동의 개인정보 보호</h2>
-                <p>본 앱은 만 13세 미만(또는 관할 법령상 기준 연령 미만) 아동의 개인정보를 고의로 수집하지 않습니다. 만약 보호자의 동의 없이 아동의 정보가 수집된 사실을 인지할 경우 즉시 필요한 조치를 취합니다.</p>
-            </div>
-
-            <div class="card">
-                <h2>6. 개인정보 보호책임자 및 문의처</h2>
-                <p>본 개인정보 처리방침에 관한 질문, 건의사항, 또는 권리 행사가 필요하신 경우 아래의 연락처로 문의해 주시기 바랍니다.</p>
-                <ul>
-                    <li><strong>앱 이름:</strong> TimeTodo (패키지명: <code>com.bebong.timetodo</code>)</li>
-                    <li><strong>개발자/관리자:</strong> kbh3983</li>
-                    <li><strong>GitHub 저장소:</strong> <a href="https://github.com/kbh3983/timetodo" target="_blank" rel="noopener noreferrer">https://github.com/kbh3983/timetodo</a></li>
-                </ul>
-            </div>
+      <section class="features-section">
+        <div class="section-header">
+          <h2 class="section-title" id="featuresTitle">TimeTodo 핵심 기능</h2>
+          <p class="section-desc" id="featuresDesc">생산성을 극대화하기 위해 꼭 필요한 도구들을 하나에 담았습니다.</p>
         </div>
 
-        <!-- ==================== ENGLISH SECTION ==================== -->
-        <div id="section-en" class="content-section">
-            <div class="card">
-                <h2>1. Overview & Core Principles</h2>
-                <p><strong>TimeTodo</strong> ("the App") values your privacy and is committed to protecting your personal data in accordance with applicable data protection laws and store guidelines.</p>
-                <p>The App <strong>does not require user registration or an account, and does not operate any external backend database server</strong>. All tasks (TODOs), timestamp records, categories, and settings created by the user are stored strictly and securely on the user's local device storage.</p>
-            </div>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">📷</div>
+            <h3 class="feature-title" id="f1Title">타임스탬프 카메라</h3>
+            <p class="feature-desc" id="f1Desc">공부, 운동, 식단, 업무 인증샷에 현재 날짜와 시간을 세련된 스탬프로 각인하여 갤러리에 저장합니다.</p>
+          </div>
 
-            <div class="card">
-                <h2>2. Information Collection & Usage</h2>
-                <p>The App processes minimal data strictly for local application functionality and never transmits personal data to external servers.</p>
-                <ul>
-                    <li><strong>Tasks & Timestamp Entries:</strong> Stored locally on the user's device for task tracking, habits, and productivity insights.</li>
-                    <li><strong>Device Permissions:</strong>
-                        <div class="highlight-box">
-                            <ul>
-                                <li><strong>Camera (Optional):</strong> Used exclusively to capture timestamped photos directly within the app.</li>
-                                <li><strong>Photo Library / Storage (Optional):</strong> Used to save captured timestamp photos to the device gallery or import photos.</li>
-                                <li><strong>Notifications (Optional):</strong> Used to deliver local notifications for deadline reminders and lock-screen task widgets.</li>
-                            </ul>
-                        </div>
-                    </li>
-                </ul>
-            </div>
+          <div class="feature-card">
+            <div class="feature-icon">✅</div>
+            <h3 class="feature-title" id="f2Title">직관적인 Todo 관리</h3>
+            <p class="feature-desc" id="f2Desc">처리한 할 일과 남은 할 일을 명확하게 구분하고, 목표 마감 시한을 설정하여 집중도를 유지합니다.</p>
+          </div>
 
-            <div class="card">
-                <h2>3. Third-Party Services & Advertising</h2>
-                <p>To support ongoing maintenance and feature updates in the free version, the App integrates <strong>Google AdMob</strong> (provided by Google LLC).</p>
-                <p>Google AdMob may collect and process non-personally identifiable information to deliver personalized or non-personalized advertisements, including:</p>
-                <ul>
-                    <li>Advertising Identifiers (e.g., Google Advertising ID, Apple IDFA)</li>
-                    <li>Device metadata (model, operating system version, locale, network provider)</li>
-                    <li>Ad performance, interaction metrics, and crash diagnostics</li>
-                </ul>
-                <p>For more details on how Google processes ad data, please review the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</p>
-            </div>
+          <div class="feature-card">
+            <div class="feature-icon">📱</div>
+            <h3 class="feature-title" id="f3Title">스마트 잠금화면 알림</h3>
+            <p class="feature-desc" id="f3Desc">화면을 켤 때마다 최우선 과제를 바로 확인하고 완료 처리할 수 있는 실시간 잠금화면 알림을 제공합니다.</p>
+          </div>
 
-            <div class="card">
-                <h2>4. Data Retention & Deletion</h2>
-                <p>Because all user data is stored locally on the device (via SharedPreferences / local sandbox storage), the developer does not possess, store, or access your data.</p>
-                <ul>
-                    <li>You can edit or delete your tasks, logs, and categories at any time inside the App.</li>
-                    <li>Uninstalling the App or clearing app data will immediately and permanently erase all stored local data.</li>
-                </ul>
-            </div>
-
-            <div class="card">
-                <h2>5. Children's Privacy</h2>
-                <p>The App is not directed to children under the age of 13. We do not knowingly collect personal information from children. If you believe that a child has provided us with personal data, please contact us so we can take appropriate action.</p>
-            </div>
-
-            <div class="card">
-                <h2>6. Developer & Contact Information</h2>
-                <p>If you have questions, feedback, or concerns regarding this Privacy Policy, please feel free to reach out via GitHub:</p>
-                <ul>
-                    <li><strong>Application:</strong> TimeTodo (Package: <code>com.bebong.timetodo</code>)</li>
-                    <li><strong>Developer:</strong> kbh3983</li>
-                    <li><strong>GitHub Repository:</strong> <a href="https://github.com/kbh3983/timetodo" target="_blank" rel="noopener noreferrer">https://github.com/kbh3983/timetodo</a></li>
-                </ul>
-            </div>
+          <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3 class="feature-title" id="f4Title">활동 캘린더 & 인사이트</h3>
+            <p class="feature-desc" id="f4Desc">월별 활동 일관성 캘린더, 24시간 활동 분포, 요일별 생산성 통계로 나의 시간 활용 습관을 분석합니다.</p>
+          </div>
         </div>
+      </section>
 
-        <footer>
-            <p>&copy; 2026 TimeTodo. All rights reserved.</p>
-        </footer>
-    </div>
+      <section class="info-section">
+        <h3 class="info-header" id="infoTitle">서비스 및 개발자 정보</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <h4 id="infoServiceLabel">서비스명</h4>
+            <p id="infoServiceValue">TimeTodo (타임투두)</p>
+          </div>
+          <div class="info-item">
+            <h4 id="infoDevLabel">개발자 / 운영자</h4>
+            <p id="infoDevValue">bebong</p>
+          </div>
+          <div class="info-item">
+            <h4 id="infoEmailLabel">문의 이메일</h4>
+            <p><a href="mailto:kmh96503981@gmail.com">kmh96503981@gmail.com</a></p>
+          </div>
+          <div class="info-item">
+            <h4 id="infoWebLabel">공식 웹페이지</h4>
+            <p><a href="https://kbh3983.github.io/todonow/">kbh3983.github.io/todonow/</a></p>
+          </div>
+          <div class="info-item">
+            <h4 id="infoPrivacyLabel">개인정보 처리방침</h4>
+            <p><a href="privacy.html" id="infoPrivacyLink">privacy.html 보기 →</a></p>
+          </div>
+          <div class="info-item">
+            <h4 id="infoCatLabel">카테고리</h4>
+            <p id="infoCatValue">생산성 / 유틸리티 (Productivity)</p>
+          </div>
+        </div>
+      </section>
+    </main>
 
-    <script>
-        function setLang(lang) {
-            const btns = document.querySelectorAll('.lang-btn');
-            btns.forEach(btn => btn.classList.remove('active'));
+    <footer>
+      <div class="footer-links">
+        <a href="./" id="footerHome">홈 (Home)</a>
+        <a href="privacy.html" id="footerPrivacy">개인정보 처리방침 (Privacy Policy)</a>
+        <a href="mailto:kmh96503981@gmail.com" id="footerContact">문의하기 (Contact)</a>
+      </div>
+      <p>© 2026 TimeTodo (bebong). All rights reserved.</p>
+    </footer>
+  </div>
 
-            const sections = document.querySelectorAll('.content-section');
-            sections.forEach(sec => sec.classList.remove('active'));
+  <script>
+    const I18N = {
+      ko: {
+        pageTitle: "TimeTodo (타임투두) - 타임스탬프 카메라 & 스마트 할 일 관리",
+        headerPrivacyLink: "🛡️ 개인정보 처리방침",
+        heroTag: "⏰ 타임스탬프 & 스마트 할 일 관리",
+        heroTitle: "순간을 기록하고,<br><span>오늘의 할 일</span>을 완벽하게",
+        heroDesc: "실시간 시각이 각인되는 타임스탬프 카메라와 잠금화면 알림, 그리고 24시간 활동 패턴 분석으로 당신의 일상을 더욱 스마트하게 관리하세요.",
+        heroBtn: "앱 다운로드 (Google Play)",
+        heroPrivacyBtn: "개인정보 처리방침 보기",
+        featuresTitle: "TimeTodo 핵심 기능",
+        featuresDesc: "생산성을 극대화하기 위해 꼭 필요한 도구들을 하나에 담았습니다.",
+        f1Title: "타임스탬프 카메라",
+        f1Desc: "공부, 운동, 식단, 업무 인증샷에 현재 날짜와 시간을 세련된 스탬프로 각인하여 갤러리에 저장합니다.",
+        f2Title: "직관적인 Todo 관리",
+        f2Desc: "처리한 할 일과 남은 할 일을 명확하게 구분하고, 목표 마감 시한을 설정하여 집중도를 유지합니다.",
+        f3Title: "스마트 잠금화면 알림",
+        f3Desc: "화면을 켤 때마다 최우선 과제를 바로 확인하고 완료 처리할 수 있는 실시간 잠금화면 알림을 제공합니다.",
+        f4Title: "활동 캘린더 & 인사이트",
+        f4Desc: "월별 활동 일관성 캘린더, 24시간 활동 분포, 요일별 생산성 통계로 나의 시간 활용 습관을 분석합니다.",
+        infoTitle: "서비스 및 개발자 정보",
+        infoServiceLabel: "서비스명",
+        infoServiceValue: "TimeTodo (타임투두)",
+        infoDevLabel: "개발자 / 운영자",
+        infoDevValue: "bebong",
+        infoEmailLabel: "문의 이메일",
+        infoWebLabel: "공식 웹페이지",
+        infoPrivacyLabel: "개인정보 처리방침",
+        infoPrivacyLink: "privacy.html 보기 →",
+        infoCatLabel: "카테고리",
+        infoCatValue: "생산성 / 유틸리티 (Productivity)",
+        footerHome: "홈 (Home)",
+        footerPrivacy: "개인정보 처리방침 (Privacy Policy)",
+        footerContact: "문의하기 (Contact)",
+        downloadAlert: "Google Play 스토어 출시 준비 중입니다!"
+      },
+      en: {
+        pageTitle: "TimeTodo - Timestamp Camera & Smart Todo Management",
+        headerPrivacyLink: "🛡️ Privacy Policy",
+        heroTag: "⏰ Timestamp Camera & Smart Todo",
+        heroTitle: "Capture Moments,<br><span>Master Daily Tasks</span>",
+        heroDesc: "Boost your productivity with instant timestamp cameras, lock screen notifications, and 24-hour activity pattern analytics.",
+        heroBtn: "Download App (Google Play)",
+        heroPrivacyBtn: "View Privacy Policy",
+        featuresTitle: "TimeTodo Core Features",
+        featuresDesc: "Essential tools combined in one place to maximize your daily productivity.",
+        f1Title: "Timestamp Camera",
+        f1Desc: "Stamp real-time date and time badges onto study, workout, and work verification photos.",
+        f2Title: "Intuitive Todo Management",
+        f2Desc: "Separate completed tasks from pending todos cleanly with flexible target deadlines.",
+        f3Title: "Lock Screen Notifications",
+        f3Desc: "Always keep your top-priority tasks in sight right on your lock screen with instant completion.",
+        f4Title: "Activity Calendar & Insights",
+        f4Desc: "Analyze productivity with monthly consistency calendars and 24-hour distribution charts.",
+        infoTitle: "Service & Developer Information",
+        infoServiceLabel: "Service Name",
+        infoServiceValue: "TimeTodo",
+        infoDevLabel: "Developer / Operator",
+        infoDevValue: "bebong",
+        infoEmailLabel: "Contact Email",
+        infoWebLabel: "Official Website",
+        infoPrivacyLabel: "Privacy Policy",
+        infoPrivacyLink: "View privacy.html →",
+        infoCatLabel: "Category",
+        infoCatValue: "Productivity / Utilities",
+        footerHome: "Home",
+        footerPrivacy: "Privacy Policy",
+        footerContact: "Contact",
+        downloadAlert: "Coming soon on Google Play Store!"
+      },
+      ja: {
+        pageTitle: "TimeTodo - タイムスタンプカメラ＆スマートToDo管理",
+        headerPrivacyLink: "🛡️ プライバシーポリシー",
+        heroTag: "⏰ タイムスタンプ＆スマートタスク管理",
+        heroTitle: "瞬間を記録し、<br><span>今日のタスク</span>を完璧に",
+        heroDesc: "リアルタイムの時刻が刻まれるスタンプカメラ、ロック画面通知、24時間活動パターン分析で生産性を高めましょう。",
+        heroBtn: "アプリをダウンロード (Google Play)",
+        heroPrivacyBtn: "プライバシーポリシーを見る",
+        featuresTitle: "TimeTodoの主な機能",
+        featuresDesc: "日々の生産性を最大化するための必須ツールを一つにまとめました。",
+        f1Title: "タイムスタンプカメラ",
+        f1Desc: "勉強、運動、仕事の記録写真に正確な日付と時刻をスタンプして保存します。",
+        f2Title: "直感的なToDo管理",
+        f2Desc: "完了済みタスクと残りタスクを整理し、期限管理で集中力を維持します。",
+        f3Title: "スマートロック画面通知",
+        f3Desc: "画面を点灯するだけで最優先タスクを即座に確認・完了できます。",
+        f4Title: "活動カレンダー＆インサイト",
+        f4Desc: "月間カレンダーや24時間活動パターンで毎日の生産性習慣を可視化します。",
+        infoTitle: "サービスおよび開発者情報",
+        infoServiceLabel: "サービス名",
+        infoServiceValue: "TimeTodo",
+        infoDevLabel: "開発者 / 運営者",
+        infoDevValue: "bebong",
+        infoEmailLabel: "お問い合わせ",
+        infoWebLabel: "公式サイト",
+        infoPrivacyLabel: "プライバシーポリシー",
+        infoPrivacyLink: "privacy.html を表示 →",
+        infoCatLabel: "カテゴリー",
+        infoCatValue: "生産性 / ユーティリティ",
+        footerHome: "ホーム",
+        footerPrivacy: "プライバシーポリシー",
+        footerContact: "お問い合わせ",
+        downloadAlert: "Google Playストアにてまもなく公開予定です！"
+      },
+      zh: {
+        pageTitle: "TimeTodo - 时间戳相机与智能待办清单",
+        headerPrivacyLink: "🛡️ 隐私政策",
+        heroTag: "⏰ 时间戳认证与智能待办管理",
+        heroTitle: "定格真实瞬间，<br><span>掌控每日待办</span>",
+        heroDesc: "通过实时时间戳水印相机、锁屏常驻提醒以及24小时活动模式分析，全方位提升您的个人生产力。",
+        heroBtn: "下载应用 (Google Play)",
+        heroPrivacyBtn: "查看隐私政策",
+        featuresTitle: "TimeTodo 核心功能",
+        featuresDesc: "集成了助您保持高效自律所需的全部核心工具。",
+        f1Title: "时间戳相机",
+        f1Desc: "在学习、健身、饮食打卡照片上添加精确时间水印并保存。",
+        f2Title: "直观的任务管理",
+        f2Desc: "清晰区分已完成与未完成任务，支持设定目标截止时间。",
+        f3Title: "锁屏实时通知",
+        f3Desc: "点亮屏幕即可一览最紧急任务，并支持直接勾选完成。",
+        f4Title: "活动日历与数据洞察",
+        f4Desc: "利用月度打卡日历和全天活动分布图表直观掌握时间使用习惯。",
+        infoTitle: "服务与开发者信息",
+        infoServiceLabel: "服务名称",
+        infoServiceValue: "TimeTodo",
+        infoDevLabel: "开发者 / 运营者",
+        infoDevValue: "bebong",
+        infoEmailLabel: "联系邮箱",
+        infoWebLabel: "官方网站",
+        infoPrivacyLabel: "隐私政策",
+        infoPrivacyLink: "查看 privacy.html →",
+        infoCatLabel: "类别",
+        infoCatValue: "效率 / 工具",
+        footerHome: "主页",
+        footerPrivacy: "隐私政策",
+        footerContact: "联系我们",
+        downloadAlert: "即将上线 Google Play 商店！"
+      },
+      es: {
+        pageTitle: "TimeTodo - Cámara con Marca de Tiempo y Gestor de Tareas",
+        headerPrivacyLink: "🛡️ Política de Privacidad",
+        heroTag: "⏰ Cámara de Marca de Tiempo y Tareas",
+        heroTitle: "Captura el Momento,<br><span>Domina tus Tareas</span>",
+        heroDesc: "Aumenta tu productividad con fotos con sellos de fecha/hora, notificaciones en pantalla de bloqueo y estadísticas de actividad.",
+        heroBtn: "Descargar App",
+        heroPrivacyBtn: "Ver Política de Privacidad",
+        featuresTitle: "Funciones Principales",
+        featuresDesc: "Herramientas esenciales para optimizar tu día a día.",
+        f1Title: "Cámara con Marca de Tiempo",
+        f1Desc: "Sella la fecha y hora exactas en tus fotos de estudio, ejercicio y trabajo.",
+        f2Title: "Gestor de Tareas Intuitivo",
+        f2Desc: "Organiza tareas pendientes y completadas con fechas límite.",
+        f3Title: "Notificaciones en Bloqueo",
+        f3Desc: "Consulta y completa tus tareas prioritarias sin desbloquear.",
+        f4Title: "Calendario y Estadísticas",
+        f4Desc: "Analiza tu constancia y patrones de actividad a lo largo de las 24 horas.",
+        infoTitle: "Información del Servicio",
+        infoServiceLabel: "Servicio",
+        infoServiceValue: "TimeTodo",
+        infoDevLabel: "Desarrollador",
+        infoDevValue: "bebong",
+        infoEmailLabel: "Contacto",
+        infoWebLabel: "Sitio Web",
+        infoPrivacyLabel: "Privacidad",
+        infoPrivacyLink: "Ver privacy.html →",
+        infoCatLabel: "Categoría",
+        infoCatValue: "Productividad",
+        footerHome: "Inicio",
+        footerPrivacy: "Política de Privacidad",
+        footerContact: "Contacto",
+        downloadAlert: "¡Próximamente en Google Play!"
+      },
+      fr: {
+        pageTitle: "TimeTodo - Caméra Horodateur et Gestion des Tâches",
+        headerPrivacyLink: "🛡️ Politique de Confidentialité",
+        heroTag: "⏰ Horodatage & Gestion des Tâches",
+        heroTitle: "Capturez l'Instant,<br><span>Maîtrisez vos Tâches</span>",
+        heroDesc: "Optimisez vos journées avec des photos horodatées, des rappels sur l'écran de verrouillage et des statistiques d'activité.",
+        heroBtn: "Télécharger l'App",
+        heroPrivacyBtn: "Politique de Confidentialité",
+        featuresTitle: "Fonctionnalités Clés",
+        featuresDesc: "Tous les outils indispensables pour votre productivité.",
+        f1Title: "Caméra Horodateur",
+        f1Desc: "Inscrivez l'heure et la date réelles sur vos photos de validation.",
+        f2Title: "Gestion Intuitive des Tâches",
+        f2Desc: "Séparez clairement vos tâches terminées et à faire avec des dates cibles.",
+        f3Title: "Écran de Verrouillage",
+        f3Desc: "Accédez à vos priorités directement depuis votre écran verrouillé.",
+        f4Title: "Statistiques & Calendrier",
+        f4Desc: "Suivez vos habitudes de travail sur 24 heures et votre constance.",
+        infoTitle: "Informations sur le Service",
+        infoServiceLabel: "Nom du Service",
+        infoServiceValue: "TimeTodo",
+        infoDevLabel: "Développeur",
+        infoDevValue: "bebong",
+        infoEmailLabel: "E-mail",
+        infoWebLabel: "Site Web",
+        infoPrivacyLabel: "Confidentialité",
+        infoPrivacyLink: "Voir privacy.html →",
+        infoCatLabel: "Catégorie",
+        infoCatValue: "Productivité",
+        footerHome: "Accueil",
+        footerPrivacy: "Politique de Confidentialité",
+        footerContact: "Contact",
+        downloadAlert: "Bientôt disponible sur Google Play !"
+      },
+      de: {
+        pageTitle: "TimeTodo - Zeitstempel-Kamera & Aufgabenverwaltung",
+        headerPrivacyLink: "🛡️ Datenschutzerklärung",
+        heroTag: "⏰ Zeitstempel & Aufgabenverwaltung",
+        heroTitle: "Momente Festhalten,<br><span>Aufgaben Meistern</span>",
+        heroDesc: "Steigern Sie Ihre Produktivität mit Zeitstempel-Fotos, Sperrbildschirm-Benachrichtigungen und Aktivitätsanalysen.",
+        heroBtn: "App Herunterladen",
+        heroPrivacyBtn: "Datenschutz ansehen",
+        featuresTitle: "Hauptfunktionen",
+        featuresDesc: "Alle essenziellen Werkzeuge für einen produktiven Tag.",
+        f1Title: "Zeitstempel-Kamera",
+        f1Desc: "Fügen Sie exakte Datums- und Uhrzeitstempel auf Nachweisfotos ein.",
+        f2Title: "Intuitive ToDo-Verwaltung",
+        f2Desc: "Trennen Sie erledigte und offene Aufgaben mit Fristen.",
+        f3Title: "Sperrbildschirm-Feed",
+        f3Desc: "Sehen und erledigen Sie wichtigste Aufgaben direkt auf dem Sperrbildschirm.",
+        f4Title: "Aktivitätskalender",
+        f4Desc: "Erkennen Sie Arbeitsgewohnheiten mit 24h-Verteilungsmustern.",
+        infoTitle: "Dienst- und Entwicklerinformationen",
+        infoServiceLabel: "Dienstname",
+        infoServiceValue: "TimeTodo",
+        infoDevLabel: "Entwickler",
+        infoDevValue: "bebong",
+        infoEmailLabel: "Kontakt",
+        infoWebLabel: "Webseite",
+        infoPrivacyLabel: "Datenschutz",
+        infoPrivacyLink: "privacy.html öffnen →",
+        infoCatLabel: "Kategorie",
+        infoCatValue: "Produktivität",
+        footerHome: "Startseite",
+        footerPrivacy: "Datenschutzerklärung",
+        footerContact: "Kontakt",
+        downloadAlert: "Bald im Google Play Store verfügbar!"
+      }
+    };
 
-            if (lang === 'ko') {
-                btns[0].classList.add('active');
-                document.getElementById('section-ko').classList.add('active');
-                document.getElementById('page-title').innerText = '개인정보 처리방침';
-                document.getElementById('page-subtitle').innerText = '최종 수정일: 2026년 11월 19일 | 시행일자: 2026년 11월 19일';
-                document.documentElement.lang = 'ko';
-            } else {
-                btns[1].classList.add('active');
-                document.getElementById('section-en').classList.add('active');
-                document.getElementById('page-title').innerText = 'Privacy Policy';
-                document.getElementById('page-subtitle').innerText = 'Last updated: November 19, 2026 | Effective: November 19, 2026';
-                document.documentElement.lang = 'en';
-            }
-        }
-    </script>
+    function detectInitialLang() {
+      const params = new URLSearchParams(window.location.search);
+      const urlLang = params.get('lang');
+      if (urlLang && I18N[urlLang]) return urlLang;
+      const saved = localStorage.getItem('timetodo_site_lang');
+      if (saved && I18N[saved]) return saved;
+      const nav = (navigator.language || navigator.userLanguage || 'ko').toLowerCase();
+      for (const code of Object.keys(I18N)) {
+        if (nav.startsWith(code)) return code;
+      }
+      return 'ko';
+    }
+
+    let currentLang = detectInitialLang();
+
+    function applyLang(lang) {
+      if (!I18N[lang]) lang = 'en';
+      currentLang = lang;
+      localStorage.setItem('timetodo_site_lang', lang);
+      document.documentElement.lang = lang;
+
+      const t = I18N[lang];
+      document.title = t.pageTitle;
+      document.getElementById('headerPrivacyLink').textContent = t.headerPrivacyLink;
+      document.getElementById('headerPrivacyLink').href = 'privacy.html?lang=' + lang;
+      document.getElementById('heroTag').textContent = t.heroTag;
+      document.getElementById('heroTitle').innerHTML = t.heroTitle;
+      document.getElementById('heroDesc').textContent = t.heroDesc;
+      document.getElementById('heroBtn').textContent = t.heroBtn;
+      document.getElementById('heroPrivacyBtn').textContent = t.heroPrivacyBtn;
+      document.getElementById('heroPrivacyBtn').href = 'privacy.html?lang=' + lang;
+      document.getElementById('featuresTitle').textContent = t.featuresTitle;
+      document.getElementById('featuresDesc').textContent = t.featuresDesc;
+      document.getElementById('f1Title').textContent = t.f1Title;
+      document.getElementById('f1Desc').textContent = t.f1Desc;
+      document.getElementById('f2Title').textContent = t.f2Title;
+      document.getElementById('f2Desc').textContent = t.f2Desc;
+      document.getElementById('f3Title').textContent = t.f3Title;
+      document.getElementById('f3Desc').textContent = t.f3Desc;
+      document.getElementById('f4Title').textContent = t.f4Title;
+      document.getElementById('f4Desc').textContent = t.f4Desc;
+      document.getElementById('infoTitle').textContent = t.infoTitle;
+      document.getElementById('infoServiceLabel').textContent = t.infoServiceLabel;
+      document.getElementById('infoServiceValue').textContent = t.infoServiceValue;
+      document.getElementById('infoDevLabel').textContent = t.infoDevLabel;
+      document.getElementById('infoDevValue').textContent = t.infoDevValue;
+      document.getElementById('infoEmailLabel').textContent = t.infoEmailLabel;
+      document.getElementById('infoWebLabel').textContent = t.infoWebLabel;
+      document.getElementById('infoPrivacyLabel').textContent = t.infoPrivacyLabel;
+      document.getElementById('infoPrivacyLink').textContent = t.infoPrivacyLink;
+      document.getElementById('infoPrivacyLink').href = 'privacy.html?lang=' + lang;
+      document.getElementById('infoCatLabel').textContent = t.infoCatLabel;
+      document.getElementById('infoCatValue').textContent = t.infoCatValue;
+      document.getElementById('footerHome').textContent = t.footerHome;
+      document.getElementById('footerHome').href = './?lang=' + lang;
+      document.getElementById('footerPrivacy').textContent = t.footerPrivacy;
+      document.getElementById('footerPrivacy').href = 'privacy.html?lang=' + lang;
+      document.getElementById('footerContact').textContent = t.footerContact;
+
+      const select = document.getElementById('langSelect');
+      if (select.value !== lang) {
+        select.value = lang;
+      }
+    }
+
+    document.getElementById('langSelect').addEventListener('change', (e) => {
+      applyLang(e.target.value);
+    });
+
+    document.getElementById('heroBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      alert(I18N[currentLang].downloadAlert);
+    });
+
+    applyLang(currentLang);
+  </script>
 </body>
-</html>
 
+</html>
