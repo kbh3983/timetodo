@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:intl/intl.dart' hide TextDirection;
+import 'package:todonow/l10n/app_strings.dart';
 import 'package:todonow/main.dart';
 
 /// 사용 가능한 타임스탬프 디자인 (적용안함 + 무료 기본 4종 + frame_1)
@@ -32,6 +34,7 @@ enum CameraAspectRatio {
 
 class TimestampLocaleFormatter {
   static const List<String> weekdaysKo = ['월', '화', '수', '목', '금', '토', '일'];
+  static const List<String> weekdaysEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   static String formatNumericDate(DateTime dt, {String sep = '.'}) {
     final y = dt.year.toString();
@@ -41,14 +44,19 @@ class TimestampLocaleFormatter {
   }
 
   static String formatLegacyN2_1Date(DateTime dt) {
+    final isKo = AppStrings.isCurrentLocaleKo;
     final y = dt.year;
     final m = dt.month.toString().padLeft(2, '0');
     final d = dt.day.toString().padLeft(2, '0');
-    final w = weekdaysKo[dt.weekday - 1];
-    return '$y년 $m월 $d일 ($w)';
+    final w = isKo ? weekdaysKo[dt.weekday - 1] : weekdaysEn[dt.weekday - 1];
+    return isKo ? '$y년 $m월 $d일 ($w)' : '$w, ${DateFormat("MMM d, yyyy").format(dt)}';
   }
 
   static String formatWordDate(DateTime dt, {bool padMonthDay = true}) {
+    final isKo = AppStrings.isCurrentLocaleKo;
+    if (!isKo) {
+      return DateFormat('MMMM d, yyyy').format(dt);
+    }
     final y = dt.year;
     final m = padMonthDay ? dt.month.toString().padLeft(2, '0') : dt.month.toString();
     final d = padMonthDay ? dt.day.toString().padLeft(2, '0') : dt.day.toString();
@@ -60,8 +68,9 @@ class TimestampLocaleFormatter {
     bool padHour = true,
     bool localizePeriod = false,
   }) {
+    final isKo = AppStrings.isCurrentLocaleKo;
     final isAm = dt.hour < 12;
-    final period = localizePeriod ? (isAm ? '오전' : '오후') : (isAm ? 'AM' : 'PM');
+    final period = (localizePeriod && isKo) ? (isAm ? '오전' : '오후') : (isAm ? 'AM' : 'PM');
     int h = dt.hour % 12;
     if (h == 0) h = 12;
     final hStr = padHour ? h.toString().padLeft(2, '0') : h.toString();
@@ -1292,19 +1301,20 @@ class _CameraPageState extends State<CameraPage> with WidgetsBindingObserver {
   }
 
   Widget _buildThumbnailContent(TimestampDesign design) {
-    final now = DateTime(_now.year, _now.month, _now.day, 12, 27);
+    // 분(minute) 단위로 정규화된 현재 시각 반영 (timenow 방식)
+    final now = DateTime(_now.year, _now.month, _now.day, _now.hour, _now.minute);
 
     switch (design) {
       case TimestampDesign.none:
-        return const Center(
+        return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.block_rounded, color: Colors.white70, size: 22),
-              SizedBox(height: 4),
+              const Icon(Icons.block_rounded, color: Colors.white70, size: 22),
+              const SizedBox(height: 4),
               Text(
-                '적용안함',
-                style: TextStyle(
+                AppStrings.isCurrentLocaleKo ? '적용안함' : 'None',
+                style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -1421,6 +1431,7 @@ class _CameraPageState extends State<CameraPage> with WidgetsBindingObserver {
         );
 
       case TimestampDesign.frame_1:
+        final frameTimeStr = TimestampLocaleFormatter.format12hTime(now, padHour: true, localizePeriod: false);
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -1444,7 +1455,7 @@ class _CameraPageState extends State<CameraPage> with WidgetsBindingObserver {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Text(
-                  '12:27',
+                  frameTimeStr,
                   style: const TextStyle(
                     fontFamily: 'RubberNippleFactory',
                     fontSize: 11,

@@ -40,6 +40,7 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
         private var lastPostedSignature: String? = null
 
         fun ensureChannel(context: Context) {
+            val isKo = Locale.getDefault().language == "ko"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 if (manager != null) {
@@ -51,10 +52,10 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
                     if (manager.getNotificationChannel(CHANNEL_ID) == null) {
                         val channel = NotificationChannel(
                             CHANNEL_ID,
-                            CHANNEL_NAME,
+                            if (isKo) "잠금화면 상시 기록" else "Lockscreen Todo",
                             NotificationManager.IMPORTANCE_LOW
                         ).apply {
-                            description = "핸드폰 잠금화면에 최우선 할 일 및 빠른 입력을 고정 표시합니다."
+                            description = if (isKo) "핸드폰 잠금화면에 최우선 할 일 및 빠른 입력을 고정 표시합니다." else "Displays top priority tasks and quick input on lockscreen."
                             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                             setSound(null, null)
                             enableVibration(false)
@@ -129,9 +130,10 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
                 val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent(context, MainActivity::class.java)
                 val contentPendingIntent = PendingIntent.getActivity(context, 100, launchIntent, immFlags)
 
+                val isKo = Locale.getDefault().language == "ko"
                 // Direct Reply Action (+ 빠른 기록)
                 val remoteInput = RemoteInput.Builder(REMOTE_INPUT_KEY)
-                    .setLabel("지금 이 순간을 기록해보세요...")
+                    .setLabel(if (isKo) "지금 이 순간을 기록해보세요..." else "Record what is happening...")
                     .build()
 
                 val addIntent = Intent(context, LockScreenNotificationReceiver::class.java).apply {
@@ -141,7 +143,7 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
 
                 val addAction = NotificationCompat.Action.Builder(
                     android.R.drawable.ic_input_add,
-                    "+ 빠른 기록",
+                    if (isKo) "+ 빠른 기록" else "+ Quick Record",
                     addPendingIntent
                 ).addRemoteInput(remoteInput)
                  .setShowsUserInterface(false)
@@ -161,18 +163,18 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
 
                 if (pendingCount == 0 || topTodo == null) {
                     // Always stay visible on lock screen even with 0 todos!
-                    val title = "🌿 잠시 여유가 있다면,"
-                    val body = "스치는 생각이나 지금 이 순간을 가볍게 남겨보세요."
+                    val title = if (isKo) "🌿 잠시 여유가 있다면," else "🌿 Take a moment,"
+                    val body = if (isKo) "스치는 생각이나 지금 이 순간을 가볍게 남겨보세요." else "Record your thoughts or current moments."
                     builder.setContentTitle(title)
                         .setContentText(body)
                         .setStyle(
                             NotificationCompat.BigTextStyle()
-                                .bigText("잠시 여유가 있다면, 지금 떠오르는 생각이나 순간을 아래 [+ 빠른 기록]으로 가볍게 남겨보세요.")
+                                .bigText(if (isKo) "잠시 여유가 있다면, 지금 떠오르는 생각이나 순간을 아래 [+ 빠른 기록]으로 가볍게 남겨보세요." else "Take a breath and capture your thoughts with [+ Quick Record] below.")
                                 .setBigContentTitle(title)
                         )
                 } else {
                     val category = topTodo.optString("category", "General")
-                    val note = topTodo.optString("note", "할 일")
+                    val note = topTodo.optString("note", if (isKo) "할 일" else "Task")
                     val targetDate = topTodo.optLong("targetDate", 0L)
 
                     var subtitle = ""
@@ -191,17 +193,17 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
                             set(Calendar.MILLISECOND, 0)
                         }
                         val diffDays = ((calTarget.timeInMillis - calNow.timeInMillis) / (24 * 3600 * 1000L)).toInt()
-                        val sdf = SimpleDateFormat("M/d HH:mm", Locale.KOREA)
-                        val timeFormat = SimpleDateFormat("HH:mm", Locale.KOREA)
+                        val sdf = SimpleDateFormat("M/d HH:mm", if (isKo) Locale.KOREA else Locale.US)
+                        val timeFormat = SimpleDateFormat("HH:mm", if (isKo) Locale.KOREA else Locale.US)
 
                         subtitle = if (targetDate < System.currentTimeMillis()) {
-                            "🚨 기한 지남 (${sdf.format(Date(targetDate))})"
+                            if (isKo) "🚨 기한 지남 (${sdf.format(Date(targetDate))})" else "🚨 Overdue (${sdf.format(Date(targetDate))})"
                         } else if (diffDays == 0) {
-                            "⏰ 오늘 마감 (${timeFormat.format(Date(targetDate))})"
+                            if (isKo) "⏰ 오늘 마감 (${timeFormat.format(Date(targetDate))})" else "⏰ Due Today (${timeFormat.format(Date(targetDate))})"
                         } else if (diffDays == 1) {
-                            "⏳ 내일 마감 (D-1) (${timeFormat.format(Date(targetDate))})"
+                            if (isKo) "⏳ 내일 마감 (D-1) (${timeFormat.format(Date(targetDate))})" else "⏳ Due Tomorrow (D-1) (${timeFormat.format(Date(targetDate))})"
                         } else {
-                            "⏳ 마감 D-$diffDays (${sdf.format(Date(targetDate))})"
+                            if (isKo) "⏳ 마감 D-$diffDays (${sdf.format(Date(targetDate))})" else "⏳ Due in $diffDays d (${sdf.format(Date(targetDate))})"
                         }
                     }
 
@@ -210,7 +212,7 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
                         body = "$body\n$subtitle"
                     }
                     if (pendingCount > 1) {
-                        body = "$body (남은 TODO: ${pendingCount - 1}개)"
+                        body = if (isKo) "$body (남은 TODO: ${pendingCount - 1}개)" else "$body (${pendingCount - 1} more tasks)"
                     }
 
                     val doneIntent = Intent(context, LockScreenNotificationReceiver::class.java).apply {
@@ -220,19 +222,19 @@ class LockScreenNotificationReceiver : BroadcastReceiver() {
 
                     val doneAction = NotificationCompat.Action.Builder(
                         android.R.drawable.checkbox_on_background,
-                        "✓ 완료",
+                        if (isKo) "✓ 완료" else "✓ Done",
                         donePendingIntent
                     ).setShowsUserInterface(false)
                      .build()
 
-                    val title = "📌 [$category] 최우선 할 일"
+                    val title = if (isKo) "📌 [$category] 최우선 할 일" else "📌 [$category] Top Task"
                     builder.setContentTitle(title)
                         .setContentText(body)
                         .setStyle(
                             NotificationCompat.BigTextStyle()
                                 .bigText(body)
                                 .setBigContentTitle(title)
-                                .setSummaryText(if (pendingCount > 1) "${pendingCount}개 TODO 대기 중" else "1개 TODO 대기 중")
+                                .setSummaryText(if (isKo) (if (pendingCount > 1) "${pendingCount}개 TODO 대기 중" else "1개 TODO 대기 중") else (if (pendingCount > 1) "$pendingCount tasks pending" else "1 task pending"))
                         )
                         .addAction(doneAction)
                 }

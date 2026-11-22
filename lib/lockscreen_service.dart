@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:todonow/l10n/app_strings.dart';
 import 'main.dart';
 
 @pragma('vm:entry-point')
@@ -38,18 +39,19 @@ class LockScreenNotificationService {
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
+    final isKo = AppStrings.isCurrentLocaleKo;
     final darwinCategory = DarwinNotificationCategory(
       kCategoryTodoActions,
       actions: <DarwinNotificationAction>[
         DarwinNotificationAction.text(
           kActionAddTodo,
-          '+ 빠른 추가',
-          buttonTitle: '추가',
-          placeholder: '새로운 할 일 입력...',
+          isKo ? '+ 빠른 추가' : '+ Quick Add',
+          buttonTitle: isKo ? '추가' : 'Add',
+          placeholder: isKo ? '새로운 할 일 입력...' : 'Enter new task...',
         ),
         DarwinNotificationAction.plain(
           kActionCompleteTopTodo,
-          '✓ 완료',
+          isKo ? '✓ 완료' : '✓ Done',
         ),
       ],
     );
@@ -173,10 +175,14 @@ class LockScreenNotificationService {
       return;
     }
 
-    final pendingTodos = entries.where((e) => e.status == 'todo').toList();
+    final pendingTodos = entries.where((e) => e.isPendingTodo).toList();
     if (pendingTodos.isEmpty) return;
 
     pendingTodos.sort((a, b) {
+      if (a.isInProgress && !b.isInProgress) return -1;
+      if (!a.isInProgress && b.isInProgress) return 1;
+      if (a.isPaused && !b.isPaused) return -1;
+      if (!a.isPaused && b.isPaused) return 1;
       if (a.targetDate != null && b.targetDate != null) {
         return a.targetDate!.compareTo(b.targetDate!);
       }
@@ -188,9 +194,27 @@ class LockScreenNotificationService {
     final top = pendingTodos.first;
     final index = entries.indexWhere((e) => e.id == top.id);
     if (index != -1) {
+      final now = DateTime.now();
+      final sessions = List<TimeSegment>.from(top.workSessions);
+      if (sessions.isNotEmpty && sessions.last.end == null) {
+        sessions[sessions.length - 1] = sessions.last.copyWith(end: now);
+      } else if (top.isInProgress) {
+        final start = top.lastResumedTimestamp ?? top.startedTimestamp ?? now;
+        sessions.add(TimeSegment(start: start, end: now));
+      }
+      int activeSec = 0;
+      for (final s in sessions) {
+        if (s.end != null) activeSec += s.end!.difference(s.start).inSeconds;
+      }
+      if (activeSec == 0 && top.totalActiveSeconds > 0) {
+        activeSec = top.totalActiveSeconds;
+      }
       entries[index] = entries[index].copyWith(
         status: 'done',
-        doneTimestamp: DateTime.now(),
+        doneTimestamp: now,
+        workSessions: sessions,
+        totalActiveSeconds: activeSec,
+        clearLastResumedTimestamp: true,
       );
 
       final String encoded =
@@ -245,7 +269,7 @@ class LockScreenNotificationService {
     final today = DateTime(now.year, now.month, now.day);
     // 마감일이 있는 미완료 TODO 중 D-3일 이내이거나 이미 기한이 지난 항목 추출 (날짜 기준 정확한 계산)
     final pendingWithDeadline = entries.where((e) {
-      if (e.status != 'todo' || e.targetDate == null) return false;
+      if (!e.isPendingTodo || e.targetDate == null) return false;
       final target = DateTime(e.targetDate!.year, e.targetDate!.month, e.targetDate!.day);
       final diffDays = target.difference(today).inDays;
       return diffDays <= 3;
@@ -264,6 +288,7 @@ class LockScreenNotificationService {
       final notifId = kDeadlineAlertBaseId + (item.id.hashCode.abs() % 10000);
       currentIds.add(notifId);
 
+      final isKo = AppStrings.isCurrentLocaleKo;
       final target = DateTime(item.targetDate!.year, item.targetDate!.month, item.targetDate!.day);
       final diffDays = target.difference(today).inDays;
       final bool isOverdue = item.targetDate!.isBefore(now);
@@ -274,20 +299,20 @@ class LockScreenNotificationService {
 
       if (isOverdue) {
         stage = 'overdue';
-        title = '🚨 [마감 경과] ${item.category} TODO';
+        title = isKo ? '🚨 [마감 경과] ${item.category} TODO' : '🚨 [Overdue] ${item.category} TODO';
         body =
-            '${item.note.isEmpty ? "할 일" : item.note}\n마감 기한이 지났습니다! (${DateFormat('M월 d일 HH:mm').format(item.targetDate!)})';
+            '${item.note.isEmpty ? (isKo ? "할 일" : "Task") : item.note}\n${isKo ? "마감 기한이 지났습니다! (" + DateFormat("M월 d일 HH:mm").format(item.targetDate!) + ")" : "Deadline passed! (" + DateFormat("MMM d, HH:mm").format(item.targetDate!) + ")"}';
       } else if (diffDays == 0) {
         stage = 'today';
-        title = '⏰ [오늘 마감!] ${item.category} TODO';
+        title = isKo ? '⏰ [오늘 마감!] ${item.category} TODO' : '⏰ [Due Today!] ${item.category} TODO';
         body =
-            '${item.note.isEmpty ? "할 일" : item.note}\n오늘 ${DateFormat('HH:mm').format(item.targetDate!)} 마감 예정입니다!';
+            '${item.note.isEmpty ? (isKo ? "할 일" : "Task") : item.note}\n${isKo ? "오늘 " + DateFormat("HH:mm").format(item.targetDate!) + " 마감 예정입니다!" : "Due today at " + DateFormat("HH:mm").format(item.targetDate!) + "!"}';
       } else {
         final days = diffDays;
         stage = 'd_$days';
-        title = '⏳ [마감 D-$days] ${item.category} TODO';
+        title = isKo ? '⏳ [마감 D-$days] ${item.category} TODO' : '⏳ [Due in $days d] ${item.category} TODO';
         body =
-            '${item.note.isEmpty ? "할 일" : item.note}\n마감일시: ${DateFormat('M월 d일 HH:mm').format(item.targetDate!)} ($days일 남음)';
+            '${item.note.isEmpty ? (isKo ? "할 일" : "Task") : item.note}\n${isKo ? "마감일시: " + DateFormat("M월 d일 HH:mm").format(item.targetDate!) + " (" + days.toString() + "일 남음)" : "Deadline: " + DateFormat("MMM d, HH:mm").format(item.targetDate!) + " (" + days.toString() + " days left)"}';
       }
 
       // 중복 알림 방지: 동일 마감 단계(stage) 및 내용에 대해 이미 알림이 전송되었다면 무시
@@ -313,8 +338,10 @@ class LockScreenNotificationService {
 
       final androidDetails = AndroidNotificationDetails(
         'chronos_deadline_alerts',
-        '마감 임박 TODO 알림',
-        channelDescription: '마감일이 3일 이내인 TODO의 푸시 알림 및 잠금화면 표시',
+        isKo ? '마감 임박 TODO 알림' : 'Deadline Alerts',
+        channelDescription: isKo
+            ? '마감일이 3일 이내인 TODO의 푸시 알림 및 잠금화면 표시'
+            : 'Push notifications and lockscreen alerts for tasks due within 3 days',
         importance: isNightTime ? Importance.low : Importance.max,
         priority: isNightTime ? Priority.low : Priority.high,
         showWhen: true,
@@ -405,17 +432,18 @@ class LockScreenNotificationService {
 
     await init();
 
-    final pendingTodos = entries.where((e) => e.status == 'todo').toList();
+    final pendingTodos = entries.where((e) => e.isPendingTodo).toList();
 
+    final isKo = AppStrings.isCurrentLocaleKo;
     // 대기 중인 TODO가 없을 때도 잠금화면에서 바로 [+ 빠른 기록] 할 수 있도록 상시 알림 유지
     if (pendingTodos.isEmpty) {
       final List<AndroidNotificationAction> emptyActions = [
-        const AndroidNotificationAction(
+        AndroidNotificationAction(
           kActionAddTodo,
-          '+ 빠른 기록',
+          isKo ? '+ 빠른 기록' : '+ Quick Record',
           inputs: <AndroidNotificationActionInput>[
             AndroidNotificationActionInput(
-              label: '지금 이 순간을 기록해보세요...',
+              label: isKo ? '지금 이 순간을 기록해보세요...' : 'Record what is happening...',
               allowFreeFormInput: true,
             ),
           ],
@@ -426,8 +454,10 @@ class LockScreenNotificationService {
 
       final androidDetails = AndroidNotificationDetails(
         'chronos_lockscreen_top_todo',
-        '잠금화면 최우선 TODO',
-        channelDescription: '핸드폰 잠금화면에 가장 중요한 TODO를 고정 표시합니다.',
+        isKo ? '잠금화면 최우선 TODO' : 'Lockscreen Top TODO',
+        channelDescription: isKo
+            ? '핸드폰 잠금화면에 가장 중요한 TODO를 고정 표시합니다.'
+            : 'Pinned notifications for your top priority tasks on lockscreen.',
         importance: Importance.high,
         priority: Priority.high,
         ongoing: true,
@@ -436,9 +466,11 @@ class LockScreenNotificationService {
         visibility: NotificationVisibility.public,
         category: AndroidNotificationCategory.reminder,
         actions: emptyActions,
-        styleInformation: const BigTextStyleInformation(
-          '잠시 여유가 있다면, 지금 떠오르는 생각이나 순간을 아래 [+ 빠른 기록]으로 가볍게 남겨보세요.',
-          contentTitle: '🌿 잠시 여유가 있다면,',
+        styleInformation: BigTextStyleInformation(
+          isKo
+              ? '잠시 여유가 있다면, 지금 떠오르는 생각이나 순간을 아래 [+ 빠른 기록]으로 가볍게 남겨보세요.'
+              : 'Take a breath and capture your thoughts with [+ Quick Record] below.',
+          contentTitle: isKo ? '🌿 잠시 여유가 있다면,' : '🌿 Take a moment,',
         ),
       );
 
@@ -452,8 +484,8 @@ class LockScreenNotificationService {
 
       await _plugin.show(
         kNotificationId,
-        '🌿 잠시 여유가 있다면,',
-        '스치는 생각이나 지금 이 순간을 가볍게 남겨보세요.',
+        isKo ? '🌿 잠시 여유가 있다면,' : '🌿 Take a moment,',
+        isKo ? '스치는 생각이나 지금 이 순간을 가볍게 남겨보세요.' : 'Record your thoughts or current moments.',
         NotificationDetails(
           android: androidDetails,
           iOS: darwinDetails,
@@ -463,10 +495,16 @@ class LockScreenNotificationService {
     }
 
     // 우선순위 정렬:
-    // 1. 가장 가까운 마감일자 (earliest deadline first)
-    // 2. 마감일자 있는 항목 우선
-    // 3. 오래된 등록 시간 순
+    // 1. 착수/진행 중(in_progress) 최우선
+    // 2. 일시정지(paused)
+    // 3. 가장 가까운 마감일자 (earliest deadline first)
+    // 4. 마감일자 있는 항목 우선
+    // 5. 오래된 등록 시간 순
     pendingTodos.sort((a, b) {
+      if (a.isInProgress && !b.isInProgress) return -1;
+      if (!a.isInProgress && b.isInProgress) return 1;
+      if (a.isPaused && !b.isPaused) return -1;
+      if (!a.isPaused && b.isPaused) return 1;
       if (a.targetDate != null && b.targetDate != null) {
         return a.targetDate!.compareTo(b.targetDate!);
       }
@@ -478,6 +516,20 @@ class LockScreenNotificationService {
     final top = pendingTodos.first;
     final totalPending = pendingTodos.length;
 
+    String headerTitle = isKo ? '📌 [${top.category}] 최우선 할 일' : '📌 [${top.category}] Top Task';
+    if (top.isInProgress) {
+      final elapsed = top.currentElapsedSeconds;
+      final m = elapsed ~/ 60;
+      headerTitle = isKo
+          ? '🔥 [${top.category}] 진행 중${m > 0 ? ' ($m분 경과)' : ''}'
+          : '🔥 [${top.category}] In Progress${m > 0 ? ' (${m}m elapsed)' : ''}';
+    } else if (top.isPaused) {
+      final m = (top.totalActiveSeconds / 60).round();
+      headerTitle = isKo
+          ? '⏸ [${top.category}] 일시정지${m > 0 ? ' ($m분 작업)' : ''}'
+          : '⏸ [${top.category}] Paused${m > 0 ? ' (${m}m worked)' : ''}';
+    }
+
     String subtitle = '';
     if (top.targetDate != null) {
       final now = DateTime.now();
@@ -486,42 +538,50 @@ class LockScreenNotificationService {
       final diffDays = target.difference(today).inDays;
 
       if (top.targetDate!.isBefore(now)) {
-        subtitle =
-            '🚨 기한 지남 (${DateFormat('M/d HH:mm').format(top.targetDate!)})';
+        subtitle = isKo
+            ? '🚨 기한 지남 (${DateFormat('M/d HH:mm').format(top.targetDate!)})'
+            : '🚨 Overdue (${DateFormat('M/d HH:mm').format(top.targetDate!)})';
       } else if (diffDays == 0) {
-        subtitle = '⏰ 오늘 마감 (${DateFormat('HH:mm').format(top.targetDate!)})';
+        subtitle = isKo
+            ? '⏰ 오늘 마감 (${DateFormat('HH:mm').format(top.targetDate!)})'
+            : '⏰ Due Today (${DateFormat('HH:mm').format(top.targetDate!)})';
       } else if (diffDays == 1) {
-        subtitle = '⏳ 내일 마감 (D-1) (${DateFormat('HH:mm').format(top.targetDate!)})';
+        subtitle = isKo
+            ? '⏳ 내일 마감 (D-1) (${DateFormat('HH:mm').format(top.targetDate!)})'
+            : '⏳ Due Tomorrow (D-1) (${DateFormat('HH:mm').format(top.targetDate!)})';
       } else {
-        subtitle =
-            '⏳ 마감 D-$diffDays (${DateFormat('M월 d일 HH:mm').format(top.targetDate!)})';
+        subtitle = isKo
+            ? '⏳ 마감 D-$diffDays (${DateFormat('M월 d일 HH:mm').format(top.targetDate!)})'
+            : '⏳ Due in $diffDays d (${DateFormat('M/d HH:mm').format(top.targetDate!)})';
       }
     }
 
-    String bodyText = top.note.isEmpty ? '할 일' : top.note;
+    String bodyText = top.note.isEmpty ? (isKo ? '할 일' : 'Task') : top.note;
     if (subtitle.isNotEmpty) {
       bodyText = '$bodyText\n$subtitle';
     }
     if (totalPending > 1) {
-      bodyText = '$bodyText (남은 TODO: ${totalPending - 1}개)';
+      bodyText = isKo
+          ? '$bodyText (남은 TODO: ${totalPending - 1}개)'
+          : '$bodyText (${totalPending - 1} more tasks)';
     }
 
     final List<AndroidNotificationAction> actions = [
-      const AndroidNotificationAction(
+      AndroidNotificationAction(
         kActionAddTodo,
-        '+ 빠른 기록',
+        isKo ? '+ 빠른 기록' : '+ Quick Record',
         inputs: <AndroidNotificationActionInput>[
           AndroidNotificationActionInput(
-            label: '지금 이 순간을 기록해보세요...',
+            label: isKo ? '지금 이 순간을 기록해보세요...' : 'Record what is happening...',
             allowFreeFormInput: true,
           ),
         ],
         cancelNotification: false,
         showsUserInterface: false,
       ),
-      const AndroidNotificationAction(
+      AndroidNotificationAction(
         kActionCompleteTopTodo,
-        '✓ 완료',
+        isKo ? '✓ 완료' : '✓ Done',
         cancelNotification: false,
         showsUserInterface: false,
       ),
@@ -529,7 +589,7 @@ class LockScreenNotificationService {
 
     final androidDetails = AndroidNotificationDetails(
       'chronos_lockscreen_top_todo',
-      '잠금화면 최우선 TODO',
+      isKo ? '잠금화면 최우선 TODO' : 'Lockscreen Top TODO',
       channelDescription: '핸드폰 잠금화면에 가장 중요한 TODO를 고정 표시합니다.',
       importance: Importance.high,
       priority: Priority.high,
@@ -542,7 +602,7 @@ class LockScreenNotificationService {
       actions: actions,
       styleInformation: BigTextStyleInformation(
         bodyText,
-        contentTitle: '📌 [${top.category}] 최우선 할 일',
+        contentTitle: headerTitle,
         summaryText:
             totalPending > 1 ? '$totalPending개 TODO 대기 중' : '1개 TODO 대기 중',
       ),

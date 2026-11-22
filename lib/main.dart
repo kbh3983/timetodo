@@ -18,6 +18,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_strings.dart';
+import 'l10n/app_localizations.dart';
+import 'app_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,18 +29,20 @@ void main() async {
   } catch (_) {}
   await ThemeController.instance.init();
   await LockScreenNotificationService.instance.init();
-  try {
-    await MobileAds.instance.initialize();
-  } catch (e) {
-    debugPrint('MobileAds initialization error: $e');
+  if (!kIsProVersion) {
+    try {
+      await MobileAds.instance.initialize();
+    } catch (e) {
+      debugPrint('MobileAds initialization error: $e');
+    }
   }
   runApp(const ChronosApp());
 }
 
-/// 앱 버전 설정
+/// 앱 버전 설정 (lib/app_config.dart 에서 설정)
 /// - false: 무료 버전 (광고 포함)
 /// - true: 유료 Pro 버전 (광고 완전 제거)
-const bool kIsProVersion = false;
+const bool kIsProVersion = AppConfig.isProVersion;
 
 /// 유료 Pro 버전 스토어 링크 (설정에서 연결될 URL)
 const String kProAppStoreUrl = 'https://play.google.com/store/apps/details?id=com.bebong.timetodo.pro';
@@ -258,6 +262,7 @@ class ChronosApp extends StatelessWidget {
           title: 'TimeTodo',
           debugShowCheckedModeBanner: false,
           localizationsDelegates: const [
+            AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
@@ -266,6 +271,12 @@ class ChronosApp extends StatelessWidget {
             Locale('en'),
             Locale('ko'),
           ],
+          localeResolutionCallback: (deviceLocale, supportedLocales) {
+            if (deviceLocale != null && deviceLocale.languageCode == 'ko') {
+              return const Locale('ko');
+            }
+            return const Locale('en'); // Default to English for all non-Korean locales!
+          },
           theme: ThemeData(
             useMaterial3: true,
             brightness: isDark ? Brightness.dark : Brightness.light,
@@ -639,7 +650,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '설정',
+                            strings.settingsTitle,
                             style: GoogleFonts.inter(
                               fontSize: 18 * _uiScale,
                               fontWeight: FontWeight.w800,
@@ -768,7 +779,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                               ),
                                               const SizedBox(height: 3),
                                               Text(
-                                                '광고 완전 제거 (곧 출시 예정)',
+                                                strings.proSubtitle,
                                                 style: GoogleFonts.inter(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w500,
@@ -793,7 +804,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                               // ------------------------------------------
                               // 1. 화면 스타일
                               // ------------------------------------------
-                              buildSectionHeader('화면 스타일', isFirst: true),
+                              buildSectionHeader(strings.isKo ? '화면 스타일' : 'Screen Style', isFirst: true),
                               buildGroupCard(
                                 children: [
                                   // 테마 선택 가로 스크롤
@@ -934,7 +945,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            '포인트 색상',
+                                            strings.isKo ? '포인트 색상' : 'Accent Color',
                                             style: GoogleFonts.inter(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
@@ -954,7 +965,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                             ),
                                             child: Text(
-                                              '초기화',
+                                              strings.resetPreset,
                                               style: GoogleFonts.inter(
                                                 fontSize: 12,
                                                 color: currentTheme.textTertiary,
@@ -995,7 +1006,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                                 ),
                                                 const SizedBox(width: 4),
                                                 Text(
-                                                  '색상 변경',
+                                                  strings.isKo ? '색상 변경' : 'Change',
                                                   style: GoogleFonts.inter(
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.w700,
@@ -1020,7 +1031,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              '배경 그라데이션',
+                                              strings.isKo ? '배경 그라데이션' : 'Background Gradient',
                                               style: GoogleFonts.inter(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
@@ -1042,11 +1053,11 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                           children: [
                                             _buildGradientIntensityChip(context, 'OFF', 0.0, setSheetState),
                                             const SizedBox(width: 6),
-                                            _buildGradientIntensityChip(context, '은은하게', 0.15, setSheetState),
+                                            _buildGradientIntensityChip(context, strings.isKo ? '은은하게' : 'Subtle', 0.15, setSheetState),
                                             const SizedBox(width: 6),
-                                            _buildGradientIntensityChip(context, '보통', 0.28, setSheetState),
+                                            _buildGradientIntensityChip(context, strings.scaleNormal, 0.28, setSheetState),
                                             const SizedBox(width: 6),
-                                            _buildGradientIntensityChip(context, '선명하게', 0.45, setSheetState),
+                                            _buildGradientIntensityChip(context, strings.isKo ? '선명하게' : 'Vivid', 0.45, setSheetState),
                                           ],
                                         ),
                                       ],
@@ -1058,7 +1069,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                               // ------------------------------------------
                               // 2. 화면 및 글자 크기
                               // ------------------------------------------
-                              buildSectionHeader('화면 및 글자 크기'),
+                              buildSectionHeader(strings.settingsUiScale),
                               buildGroupCard(
                                 children: [
                                   Padding(
@@ -1070,7 +1081,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              'UI 및 글자 크기',
+                                              strings.settingsUiScale,
                                               style: GoogleFonts.inter(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
@@ -1090,13 +1101,13 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                         const SizedBox(height: 10),
                                         Row(
                                           children: [
-                                            _buildScaleSegment(context, '작게', 0.8, setSheetState),
+                                            _buildScaleSegment(context, strings.scaleSmall, 0.8, setSheetState),
                                             const SizedBox(width: 6),
-                                            _buildScaleSegment(context, '조금 작게', 0.9, setSheetState),
+                                            _buildScaleSegment(context, strings.isKo ? '조금 작게' : 'Compact', 0.9, setSheetState),
                                             const SizedBox(width: 6),
-                                            _buildScaleSegment(context, '보통', 1.0, setSheetState),
+                                            _buildScaleSegment(context, strings.scaleNormal, 1.0, setSheetState),
                                             const SizedBox(width: 6),
-                                            _buildScaleSegment(context, '크게', 1.1, setSheetState),
+                                            _buildScaleSegment(context, strings.scaleLarge, 1.1, setSheetState),
                                           ],
                                         ),
                                       ],
@@ -1108,7 +1119,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                               // ------------------------------------------
                               // 3. 알림 및 잠금화면
                               // ------------------------------------------
-                              buildSectionHeader('알림 및 잠금화면'),
+                              buildSectionHeader(strings.isKo ? '알림 및 잠금화면' : 'Notifications & Lockscreen'),
                               buildGroupCard(
                                 children: [
                                   Padding(
@@ -1123,7 +1134,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            '잠금화면 최우선 TODO',
+                                            strings.isKo ? '잠금화면 최우선 TODO' : 'Lockscreen Top TODO',
                                             style: GoogleFonts.inter(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
@@ -1159,7 +1170,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            '마감 알림 (D-3 ~ 마감일)',
+                                            strings.isKo ? '마감 알림 (D-3 ~ 마감일)' : 'Deadline Alerts (D-3 ~ Due Date)',
                                             style: GoogleFonts.inter(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
@@ -1362,7 +1373,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                 const SizedBox(height: 6),
                 Center(
                   child: Text(
-                    '더 쾌적한 광고 없는 Pro 버전이 곧 출시됩니다!',
+                    AppStrings.of(parentContext).proSubtitle,
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -1384,8 +1395,8 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                     children: [
                       _buildProBenefitRow(
                         Icons.block_rounded,
-                        '광고 완전 제거',
-                        '상단 배너 및 모든 광고가 완전히 사라집니다.',
+                        AppStrings.of(parentContext).proRemoveAds,
+                        AppStrings.of(parentContext).proRemoveAdsDesc,
                         const Color(0xFFEF4444),
                         theme,
                       ),
@@ -1401,7 +1412,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                       ScaffoldMessenger.of(parentContext).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'TimeTodo Pro(광고 제거 버전)가 곧 출시될 예정입니다! 기대해 주세요 🚀',
+                            AppStrings.of(parentContext).proComingSoonToast,
                             style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                           ),
                           backgroundColor: const Color(0xFFF59E0B),
@@ -1420,7 +1431,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                       ),
                     ),
                     child: Text(
-                      '곧 출시될 예정이에요',
+                      AppStrings.of(parentContext).isKo ? '곧 출시될 예정이에요' : 'Coming Soon',
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -1581,7 +1592,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                       ),
                     ),
                     child: Text(
-                      '마음이 잘 전달되었어요',
+                      strings.isKo ? '마음이 잘 전달되었어요' : 'You are wonderful!',
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -1598,10 +1609,15 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
   }
 
   void _showSupportRewardedAd(BuildContext context) {
+    if (kIsProVersion) {
+      _showCheerThankYouSheet(context);
+      return;
+    }
     if (_isLoadingRewardedAd) return;
     _isLoadingRewardedAd = true;
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final strings = AppStrings.of(context);
 
     scaffoldMessenger.showSnackBar(
       SnackBar(
@@ -1614,7 +1630,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
             ),
             const SizedBox(width: 12),
             Text(
-              '응원 광고를 준비하고 있습니다... ❤️',
+              strings.cheerAdLoading,
               style: GoogleFonts.inter(fontWeight: FontWeight.w600),
             ),
           ],
@@ -1653,7 +1669,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
               scaffoldMessenger.showSnackBar(
                 SnackBar(
                   content: Text(
-                    '광고를 재생하는 중 문제가 발생했습니다.',
+                    strings.adPlaybackError,
                     style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                   ),
                   backgroundColor: const Color(0xFFEF4444),
@@ -1676,7 +1692,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
           scaffoldMessenger.showSnackBar(
             SnackBar(
               content: Text(
-                '현재 표시할 수 있는 응원 광고가 없습니다. 마음만으로도 정말 감사드려요 💛',
+                strings.adUnavailableCheer,
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600),
               ),
               backgroundColor: const Color(0xFF64748B),
@@ -1917,6 +1933,60 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
     final TextEditingController doneNoteController = TextEditingController();
     File? doneImage;
 
+    final now = DateTime.now();
+    final previewSessions = List<TimeSegment>.from(entry.workSessions);
+    if (previewSessions.isNotEmpty && previewSessions.last.end == null) {
+      previewSessions[previewSessions.length - 1] = previewSessions.last.copyWith(end: now);
+    } else if (entry.isInProgress) {
+      final start = entry.lastResumedTimestamp ?? entry.startedTimestamp ?? now;
+      previewSessions.add(TimeSegment(start: start, end: now));
+    }
+    int totalSec = 0;
+    for (final s in previewSessions) {
+      if (s.end != null) totalSec += s.end!.difference(s.start).inSeconds;
+    }
+    if (totalSec == 0 && entry.totalActiveSeconds > 0) {
+      totalSec = entry.totalActiveSeconds;
+    }
+    int initialMinutes = (totalSec / 60).round();
+    if (initialMinutes == 0 && totalSec > 0) {
+      initialMinutes = 1;
+    } else if (initialMinutes == 0 && entry.manualDurationMinutes != null) {
+      initialMinutes = entry.manualDurationMinutes!;
+    }
+
+    bool isManualMode = entry.isManualDuration;
+    int manualHours = 0;
+    int manualMinutes = 0;
+    int manualSeconds = 0;
+
+    if (entry.manualDurationSeconds != null && entry.manualDurationSeconds! > 0) {
+      final ms = entry.manualDurationSeconds!;
+      manualHours = ms ~/ 3600;
+      manualMinutes = (ms % 3600) ~/ 60;
+      manualSeconds = ms % 60;
+    } else if (entry.manualDurationMinutes != null && entry.manualDurationMinutes! > 0) {
+      final mm = entry.manualDurationMinutes!;
+      manualHours = mm ~/ 60;
+      manualMinutes = mm % 60;
+      manualSeconds = 0;
+    } else if (totalSec > 0) {
+      manualHours = totalSec ~/ 3600;
+      manualMinutes = (totalSec % 3600) ~/ 60;
+      manualSeconds = totalSec % 60;
+    } else if (initialMinutes > 0) {
+      manualHours = initialMinutes ~/ 60;
+      manualMinutes = initialMinutes % 60;
+      manualSeconds = 0;
+    }
+
+    final TextEditingController manualHoursController =
+        TextEditingController(text: manualHours > 0 ? manualHours.toString() : '');
+    final TextEditingController manualMinutesController =
+        TextEditingController(text: manualMinutes > 0 ? manualMinutes.toString() : '');
+    final TextEditingController manualSecondsController =
+        TextEditingController(text: manualSeconds > 0 ? manualSeconds.toString() : '');
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1925,6 +1995,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) {
+          final s = AppStrings.of(context);
           final bottomInset = MediaQuery.of(context).viewInsets.bottom;
           final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
           final double effectiveBottom =
@@ -2005,7 +2076,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '완료 기록',
+                            AppStrings.of(context).doneSheetTitle,
                             style: GoogleFonts.inter(
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
@@ -2033,7 +2104,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '이 챕터를 완료하며 남길 메모나 사진을 추가하세요.',
+                        AppStrings.of(context).doneSheetSubtitle,
                         style: GoogleFonts.inter(
                           color: appTextTertiary,
                           fontSize: 12.5,
@@ -2081,7 +2152,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                         keyboardType: TextInputType.multiline,
                         style: GoogleFonts.inter(fontSize: 14, color: appText),
                         decoration: InputDecoration(
-                          hintText: '어떤 성과를 이루셨나요?',
+                          hintText: AppStrings.of(context).doneNoteHint,
                           hintStyle: GoogleFonts.inter(fontSize: 13.5, color: appTextTertiary),
                           filled: true,
                           fillColor: appSubtleBg,
@@ -2125,6 +2196,277 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                       ),
                       const SizedBox(height: 12),
 
+                      // Duration Section: Measured or Manual input
+                      if (!isManualMode)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            setSheetState(() => isManualMode = true);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: categoryColor.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: categoryColor.withOpacity(0.2),
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.timer_outlined, size: 16, color: categoryColor),
+                                const SizedBox(width: 8),
+                                Text(
+                                  AppStrings.of(context).measuredWorkTime,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: appTextSecondary,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  (totalSec > 0 || initialMinutes > 0)
+                                      ? formatSecondsKo(totalSec > 0 ? totalSec : initialMinutes * 60)
+                                      : AppStrings.of(context).addTime,
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: (totalSec > 0 || initialMinutes > 0) ? categoryColor : appTextTertiary,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.edit_outlined,
+                                  size: 15,
+                                  color: categoryColor.withOpacity(0.85),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: categoryColor.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: categoryColor.withOpacity(0.35),
+                              width: 1.4,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.edit_note_rounded, size: 16, color: categoryColor),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    AppStrings.of(context).manualWorkTimeInput,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: appTextSecondary,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (totalSec > 0 || initialMinutes > 0)
+                                    GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () {
+                                        setSheetState(() {
+                                          isManualMode = false;
+                                          if (totalSec > 0) {
+                                            manualHours = totalSec ~/ 3600;
+                                            manualMinutes = (totalSec % 3600) ~/ 60;
+                                            manualSeconds = totalSec % 60;
+                                          } else if (initialMinutes > 0) {
+                                            manualHours = initialMinutes ~/ 60;
+                                            manualMinutes = initialMinutes % 60;
+                                            manualSeconds = 0;
+                                          }
+                                          manualHoursController.text = manualHours > 0 ? manualHours.toString() : '';
+                                          manualMinutesController.text = manualMinutes > 0 ? manualMinutes.toString() : '';
+                                          manualSecondsController.text = manualSeconds > 0 ? manualSeconds.toString() : '';
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: isAppDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.restart_alt_rounded, size: 12, color: appTextSecondary),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              AppStrings.of(context).restoreMeasured,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: appTextSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  // Hours
+                                  Expanded(
+                                    child: Container(
+                                      height: 38,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      decoration: BoxDecoration(
+                                        color: isAppDark ? Colors.white.withOpacity(0.04) : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: appBorder),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: manualHoursController,
+                                              keyboardType: TextInputType.number,
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.jetBrainsMono(
+                                                fontSize: 13,
+                                                color: appText,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              decoration: InputDecoration(
+                                                hintText: '0',
+                                                hintStyle: TextStyle(color: appTextTertiary),
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                              ),
+                                              onChanged: (val) {
+                                                final p = int.tryParse(val) ?? 0;
+                                                setSheetState(() => manualHours = p.clamp(0, 999));
+                                              },
+                                            ),
+                                          ),
+                                          Text(AppStrings.of(context).unitHour, style: GoogleFonts.inter(fontSize: 11, color: appTextTertiary)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  // Minutes
+                                  Expanded(
+                                    child: Container(
+                                      height: 38,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      decoration: BoxDecoration(
+                                        color: isAppDark ? Colors.white.withOpacity(0.04) : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: appBorder),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: manualMinutesController,
+                                              keyboardType: TextInputType.number,
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.jetBrainsMono(
+                                                fontSize: 13,
+                                                color: appText,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              decoration: InputDecoration(
+                                                hintText: '0',
+                                                hintStyle: TextStyle(color: appTextTertiary),
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                              ),
+                                              onChanged: (val) {
+                                                final p = int.tryParse(val) ?? 0;
+                                                setSheetState(() => manualMinutes = p.clamp(0, 59));
+                                              },
+                                            ),
+                                          ),
+                                          Text(AppStrings.of(context).unitMinute, style: GoogleFonts.inter(fontSize: 11, color: appTextTertiary)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  // Seconds
+                                  Expanded(
+                                    child: Container(
+                                      height: 38,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      decoration: BoxDecoration(
+                                        color: isAppDark ? Colors.white.withOpacity(0.04) : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: appBorder),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: manualSecondsController,
+                                              keyboardType: TextInputType.number,
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.jetBrainsMono(
+                                                fontSize: 13,
+                                                color: appText,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              decoration: InputDecoration(
+                                                hintText: '0',
+                                                hintStyle: TextStyle(color: appTextTertiary),
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                              ),
+                                              onChanged: (val) {
+                                                final p = int.tryParse(val) ?? 0;
+                                                setSheetState(() => manualSeconds = p.clamp(0, 59));
+                                              },
+                                            ),
+                                          ),
+                                          Text(AppStrings.of(context).unitSecond, style: GoogleFonts.inter(fontSize: 11, color: appTextTertiary)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Text(
+                                    AppStrings.of(context).inputDurationLabel,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: appTextTertiary,
+                                    ),
+                                  ),
+                                  Text(
+                                    formatSecondsKo((manualHours * 3600) + (manualMinutes * 60) + manualSeconds),
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: categoryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 14),
+
                       // Action Buttons Row (Compact Cancel + Wide Main Button)
                       Row(
                         children: [
@@ -2141,7 +2483,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                 padding: EdgeInsets.zero,
                               ),
                               child: Text(
-                                '취소',
+                                AppStrings.of(context).commonCancel,
                                 style: GoogleFonts.inter(
                                   color: appTextSecondary,
                                   fontWeight: FontWeight.w600,
@@ -2160,16 +2502,44 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                   final updatedEntries = List<TimestampEntry>.from(_entries);
                                   final index = updatedEntries.indexWhere((e) => e.id == entry.id);
                                   if (index != -1) {
-                                    updatedEntries[index] = TimestampEntry(
-                                      id: entry.id,
-                                      timestamp: entry.timestamp,
-                                      note: entry.note,
-                                      category: entry.category,
-                                      imagePath: entry.imagePath,
+                                    final saveTime = DateTime.now();
+                                    final finalSessions = List<TimeSegment>.from(entry.workSessions);
+                                    if (finalSessions.isNotEmpty && finalSessions.last.end == null) {
+                                      finalSessions[finalSessions.length - 1] =
+                                          finalSessions.last.copyWith(end: saveTime);
+                                    } else if (entry.isInProgress) {
+                                      final start = entry.lastResumedTimestamp ?? entry.startedTimestamp ?? saveTime;
+                                      finalSessions.add(TimeSegment(start: start, end: saveTime));
+                                    }
+                                    int finalActiveSec = 0;
+                                    for (final s in finalSessions) {
+                                      if (s.end != null) {
+                                        finalActiveSec += s.end!.difference(s.start).inSeconds;
+                                      }
+                                    }
+                                    if (finalActiveSec == 0 && entry.totalActiveSeconds > 0) {
+                                      finalActiveSec = entry.totalActiveSeconds;
+                                    }
+
+                                    int? manualDurationSec;
+                                    if (isManualMode) {
+                                      final calcSec = (manualHours * 3600) + (manualMinutes * 60) + manualSeconds;
+                                      if (calcSec > 0) {
+                                        manualDurationSec = calcSec;
+                                      }
+                                    }
+
+                                    updatedEntries[index] = entry.copyWith(
                                       status: 'done',
-                                      doneTimestamp: DateTime.now(),
+                                      doneTimestamp: saveTime,
                                       doneNote: doneNoteController.text.trim(),
                                       doneImagePath: savedPath,
+                                      workSessions: finalSessions,
+                                      totalActiveSeconds: finalActiveSec,
+                                      manualDurationSeconds: manualDurationSec,
+                                      manualDurationMinutes: manualDurationSec != null ? (manualDurationSec / 60).round() : null,
+                                      clearManualDuration: !isManualMode || manualDurationSec == null,
+                                      clearLastResumedTimestamp: true,
                                     );
                                     _onEntriesChanged(updatedEntries);
                                   }
@@ -2182,7 +2552,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                 ),
                                 child: Text(
-                                  '완료 기록 저장',
+                                  AppStrings.of(context).saveCompletion,
                                   style: GoogleFonts.inter(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
@@ -2260,7 +2630,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        'TODO로 되돌리기',
+                        AppStrings.of(context).revertTodoTitle,
                         style: GoogleFonts.inter(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
@@ -2272,7 +2642,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    '이 작업을 다시 TODO로 되돌리시겠습니까?\n기존에 기록했던 완료 메모와 완료 시간이 초기화됩니다.',
+                    AppStrings.of(context).revertTodoDesc,
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       color: appTextSecondary,
@@ -2295,7 +2665,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                             padding: EdgeInsets.zero,
                           ),
                           child: Text(
-                            '취소',
+                            AppStrings.of(context).commonCancel,
                             style: GoogleFonts.inter(
                               color: appTextSecondary,
                               fontWeight: FontWeight.w600,
@@ -2313,16 +2683,15 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                               final updatedEntries = List<TimestampEntry>.from(_entries);
                               final index = updatedEntries.indexWhere((e) => e.id == entry.id);
                               if (index != -1) {
-                                updatedEntries[index] = TimestampEntry(
-                                  id: entry.id,
-                                  timestamp: entry.timestamp,
-                                  note: entry.note,
-                                  category: entry.category,
-                                  imagePath: entry.imagePath,
+                                updatedEntries[index] = entry.copyWith(
                                   status: 'todo',
-                                  doneTimestamp: null,
-                                  doneNote: null,
-                                  doneImagePath: null,
+                                  clearDoneTimestamp: true,
+                                  clearDoneNote: true,
+                                  clearDoneImage: true,
+                                  clearManualDuration: true,
+                                  clearLastResumedTimestamp: true,
+                                  clearStartedTimestamp: true,
+                                  totalActiveSeconds: 0,
                                 );
                                 _onEntriesChanged(updatedEntries);
                               }
@@ -2337,7 +2706,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
                               ),
                             ),
                             child: Text(
-                              '되돌리기',
+                              AppStrings.of(context).revertConfirm,
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -2362,22 +2731,17 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
     final index = updatedEntries.indexWhere((e) => e.id == id);
     if (index != -1) {
       final entry = updatedEntries[index];
-      if (entry.status == 'todo') {
+      if (entry.isPendingTodo) {
         _showDoneCompletionSheet(entry);
       } else if (entry.status == 'done') {
         _showRevertConfirmSheet(entry);
       } else {
         // 일반 항목(none) -> TODO로 전환
-        updatedEntries[index] = TimestampEntry(
-          id: entry.id,
-          timestamp: entry.timestamp,
-          note: entry.note,
-          category: entry.category,
-          imagePath: entry.imagePath,
+        updatedEntries[index] = entry.copyWith(
           status: 'todo',
-          doneTimestamp: null,
-          doneNote: null,
-          doneImagePath: null,
+          clearDoneTimestamp: true,
+          clearDoneNote: true,
+          clearDoneImage: true,
         );
         _onEntriesChanged(updatedEntries);
       }
@@ -2833,30 +3197,137 @@ class NotchedTopBorderPainter extends CustomPainter {
   }
 }
 
+class TimeSegment {
+  final DateTime start;
+  final DateTime? end;
+
+  const TimeSegment({
+    required this.start,
+    this.end,
+  });
+
+  int get durationInSeconds {
+    final finish = end ?? DateTime.now();
+    final diff = finish.difference(start).inSeconds;
+    return diff > 0 ? diff : 0;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'start': start.millisecondsSinceEpoch,
+    'end': end?.millisecondsSinceEpoch,
+  };
+
+  factory TimeSegment.fromJson(Map<String, dynamic> json) => TimeSegment(
+    start: DateTime.fromMillisecondsSinceEpoch(json['start']),
+    end: json['end'] != null ? DateTime.fromMillisecondsSinceEpoch(json['end']) : null,
+  );
+
+  TimeSegment copyWith({DateTime? start, DateTime? end}) => TimeSegment(
+    start: start ?? this.start,
+    end: end ?? this.end,
+  );
+}
+
+/// 한국어 및 영어 동적 지원 시간 포맷터 (비한국어는 영어가 디폴트)
+String formatDurationKo(Duration diff) => AppStrings.formatDuration(diff);
+
+String formatSecondsKo(int totalSeconds) => AppStrings.formatSeconds(totalSeconds);
+
 class TimestampEntry {
   final String id;
   final DateTime timestamp;
   final String note;
   final String category;
   final String? imagePath;
-  final String status; // 'none', 'todo', 'done'
+  final String status; // 'none', 'todo', 'in_progress', 'paused', 'done'
   final DateTime? doneTimestamp;
   final String? doneNote;
   final String? doneImagePath;
   final DateTime? targetDate;
   final int? manualDurationMinutes;
+  final int? manualDurationSeconds;
+
+  // Work tracking fields (이정표 기반 구간 기록)
+  final DateTime? startedTimestamp;
+  final DateTime? lastResumedTimestamp;
+  final int totalActiveSeconds;
+  final List<TimeSegment> workSessions;
 
   String get text => note;
 
-  int get effectiveDurationMinutes => computedDurationMinutes ?? 0;
+  bool get isTodo => status == 'todo';
+  bool get isInProgress => status == 'in_progress';
+  bool get isPaused => status == 'paused';
+  bool get isDone => status == 'done';
+  bool get isPendingTodo => status == 'todo' || status == 'in_progress' || status == 'paused';
+  bool get isAnyTodo => isPendingTodo || isDone;
+  bool get isManualDuration =>
+      (manualDurationSeconds != null && manualDurationSeconds! > 0) ||
+      (manualDurationMinutes != null && manualDurationMinutes! > 0);
+
+  int get currentElapsedSeconds {
+    if (workSessions.isNotEmpty) {
+      int total = 0;
+      for (final s in workSessions) {
+        if (s.end != null) {
+          total += s.end!.difference(s.start).inSeconds;
+        } else if (isInProgress) {
+          total += DateTime.now().difference(s.start).inSeconds;
+        }
+      }
+      return total;
+    }
+    if (isInProgress && lastResumedTimestamp != null) {
+      final additional = DateTime.now().difference(lastResumedTimestamp!).inSeconds;
+      return totalActiveSeconds + (additional > 0 ? additional : 0);
+    }
+    return totalActiveSeconds;
+  }
+
+  int? get computedDurationSeconds {
+    if (manualDurationSeconds != null && manualDurationSeconds! > 0) {
+      return manualDurationSeconds;
+    }
+    if (manualDurationMinutes != null && manualDurationMinutes! > 0) {
+      return manualDurationMinutes! * 60;
+    }
+    if (status == 'done') {
+      if (workSessions.isNotEmpty) {
+        int total = 0;
+        for (final s in workSessions) {
+          if (s.end != null) {
+            total += s.end!.difference(s.start).inSeconds;
+          }
+        }
+        if (total > 0) return total;
+      }
+      if (totalActiveSeconds > 0) {
+        return totalActiveSeconds;
+      }
+      if (startedTimestamp != null && doneTimestamp != null) {
+        final diff = doneTimestamp!.difference(startedTimestamp!).inSeconds;
+        return diff >= 0 ? diff : 0;
+      }
+      if (doneTimestamp != null) {
+        final diff = doneTimestamp!.difference(timestamp).inSeconds;
+        return (diff > 0 && diff <= 720 * 60) ? diff : 0;
+      }
+    }
+    return null;
+  }
+
+  int get effectiveDurationSeconds {
+    final computed = computedDurationSeconds;
+    if (computed != null && computed > 0) return computed;
+    if (isPendingTodo) return currentElapsedSeconds;
+    return 0;
+  }
+
+  int get effectiveDurationMinutes => (effectiveDurationSeconds / 60).round();
 
   int? get computedDurationMinutes {
-    if (manualDurationMinutes != null) {
-      return manualDurationMinutes;
-    }
-    if (status == 'done' && doneTimestamp != null) {
-      return doneTimestamp!.difference(timestamp).inMinutes;
-    }
+    final sec = computedDurationSeconds;
+    if (sec != null) return (sec / 60).round();
     return null;
   }
 
@@ -2869,9 +3340,14 @@ class TimestampEntry {
     this.status = 'none',
     this.doneTimestamp,
     this.doneNote,
-     this.doneImagePath,
+    this.doneImagePath,
     this.targetDate,
     this.manualDurationMinutes,
+    this.manualDurationSeconds,
+    this.startedTimestamp,
+    this.lastResumedTimestamp,
+    this.totalActiveSeconds = 0,
+    this.workSessions = const [],
   });
 
   TimestampEntry copyWith({
@@ -2883,11 +3359,22 @@ class TimestampEntry {
     bool clearImage = false,
     String? status,
     DateTime? doneTimestamp,
+    bool clearDoneTimestamp = false,
     String? doneNote,
+    bool clearDoneNote = false,
     String? doneImagePath,
+    bool clearDoneImage = false,
     DateTime? targetDate,
+    bool clearTargetDate = false,
     int? manualDurationMinutes,
+    int? manualDurationSeconds,
     bool clearManualDuration = false,
+    DateTime? startedTimestamp,
+    bool clearStartedTimestamp = false,
+    DateTime? lastResumedTimestamp,
+    bool clearLastResumedTimestamp = false,
+    int? totalActiveSeconds,
+    List<TimeSegment>? workSessions,
   }) {
     return TimestampEntry(
       id: id ?? this.id,
@@ -2896,13 +3383,24 @@ class TimestampEntry {
       category: category ?? this.category,
       imagePath: clearImage ? null : (imagePath ?? this.imagePath),
       status: status ?? this.status,
-      doneTimestamp: doneTimestamp ?? this.doneTimestamp,
-      doneNote: doneNote ?? this.doneNote,
-      doneImagePath: doneImagePath ?? this.doneImagePath,
-      targetDate: targetDate ?? this.targetDate,
+      doneTimestamp: clearDoneTimestamp ? null : (doneTimestamp ?? this.doneTimestamp),
+      doneNote: clearDoneNote ? null : (doneNote ?? this.doneNote),
+      doneImagePath: clearDoneImage ? null : (doneImagePath ?? this.doneImagePath),
+      targetDate: clearTargetDate ? null : (targetDate ?? this.targetDate),
       manualDurationMinutes: clearManualDuration
           ? null
           : (manualDurationMinutes ?? this.manualDurationMinutes),
+      manualDurationSeconds: clearManualDuration
+          ? null
+          : (manualDurationSeconds ?? this.manualDurationSeconds),
+      startedTimestamp: clearStartedTimestamp
+          ? null
+          : (startedTimestamp ?? this.startedTimestamp),
+      lastResumedTimestamp: clearLastResumedTimestamp
+          ? null
+          : (lastResumedTimestamp ?? this.lastResumedTimestamp),
+      totalActiveSeconds: totalActiveSeconds ?? this.totalActiveSeconds,
+      workSessions: workSessions ?? this.workSessions,
     );
   }
 
@@ -2915,9 +3413,14 @@ class TimestampEntry {
     'status': status,
     'doneTimestamp': doneTimestamp?.millisecondsSinceEpoch,
     'doneNote': doneNote,
-     'doneImagePath': doneImagePath,
-     'targetDate': targetDate?.millisecondsSinceEpoch,
-    'manualDurationMinutes': manualDurationMinutes,
+    'doneImagePath': doneImagePath,
+    'targetDate': targetDate?.millisecondsSinceEpoch,
+    'manualDurationMinutes': manualDurationMinutes ?? (manualDurationSeconds != null ? (manualDurationSeconds! / 60).round() : null),
+    'manualDurationSeconds': manualDurationSeconds,
+    'startedTimestamp': startedTimestamp?.millisecondsSinceEpoch,
+    'lastResumedTimestamp': lastResumedTimestamp?.millisecondsSinceEpoch,
+    'totalActiveSeconds': totalActiveSeconds,
+    'workSessions': workSessions.map((s) => s.toJson()).toList(),
   };
 
   factory TimestampEntry.fromJson(Map<String, dynamic> json) => TimestampEntry(
@@ -2932,10 +3435,26 @@ class TimestampEntry {
         : null,
     doneNote: json['doneNote'],
     doneImagePath: json['doneImagePath'],
-       targetDate: json['targetDate'] != null
+    targetDate: json['targetDate'] != null
         ? DateTime.fromMillisecondsSinceEpoch(json['targetDate'])
         : null,
     manualDurationMinutes: json['manualDurationMinutes'],
+    manualDurationSeconds: json['manualDurationSeconds'] ??
+        (json['manualDurationMinutes'] != null
+            ? (json['manualDurationMinutes'] as int) * 60
+            : null),
+    startedTimestamp: json['startedTimestamp'] != null
+        ? DateTime.fromMillisecondsSinceEpoch(json['startedTimestamp'])
+        : null,
+    lastResumedTimestamp: json['lastResumedTimestamp'] != null
+        ? DateTime.fromMillisecondsSinceEpoch(json['lastResumedTimestamp'])
+        : null,
+    totalActiveSeconds: json['totalActiveSeconds'] ?? 0,
+    workSessions: json['workSessions'] != null
+        ? (json['workSessions'] as List)
+            .map((s) => TimeSegment.fromJson(s as Map<String, dynamic>))
+            .toList()
+        : const [],
   );
 }
 
@@ -3143,7 +3662,7 @@ class _QuickAddHeaderDelegate extends SliverPersistentHeaderDelegate {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '이 순간을 기록해볼까요',
+                        AppStrings.of(context).quickAddHint,
                         style: GoogleFonts.inter(
                           color: isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF0F172A),
                           fontSize: 13.5 * uiScale,
@@ -3155,7 +3674,9 @@ class _QuickAddHeaderDelegate extends SliverPersistentHeaderDelegate {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '당신을 채우는 작은 조각들을 더해보세요',
+                        AppStrings.of(context).isKo
+                            ? '당신을 채우는 작은 조각들을 더해보세요'
+                            : 'Capture your moments and milestones',
                         style: GoogleFonts.inter(
                           color: isDark ? Colors.white.withOpacity(0.45) : const Color(0xFF64748B),
                           fontSize: 10.5 * uiScale,
@@ -3245,6 +3766,7 @@ Future<Color?> showCustomColorPickerDialog(
     isDismissible: true,
     builder: (dialogCtx) => StatefulBuilder(
       builder: (context, setPickerState) {
+        final s = AppStrings.of(context);
         final Color displayColor = hsvColor.toColor();
         final String hexString =
             '#${displayColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
@@ -3309,7 +3831,7 @@ Future<Color?> showCustomColorPickerDialog(
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '커스텀 색상 선택',
+                      s.customColorTitle,
                       style: GoogleFonts.inter(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
@@ -3407,7 +3929,7 @@ Future<Color?> showCustomColorPickerDialog(
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '색상 팔레트',
+                          s.colorPalette,
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -3457,7 +3979,7 @@ Future<Color?> showCustomColorPickerDialog(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '색상 (Hue)',
+                              s.colorHue,
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -3521,7 +4043,7 @@ Future<Color?> showCustomColorPickerDialog(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '채도 (Saturation)',
+                              s.colorSaturation,
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -3580,7 +4102,7 @@ Future<Color?> showCustomColorPickerDialog(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '밝기 (Brightness)',
+                              s.colorBrightness,
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -3651,7 +4173,7 @@ Future<Color?> showCustomColorPickerDialog(
                                   padding: EdgeInsets.zero,
                                 ),
                                 child: Text(
-                                  '취소',
+                                  s.commonCancel,
                                   style: GoogleFonts.inter(
                                     color: appTextSecondary,
                                     fontWeight: FontWeight.w600,
@@ -3677,7 +4199,7 @@ Future<Color?> showCustomColorPickerDialog(
                                     ),
                                   ),
                                   child: Text(
-                                    '색상 적용',
+                                    s.applyColor,
                                     style: GoogleFonts.inter(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 14.5,
@@ -3710,7 +4232,7 @@ Future<DateTime?> showDeadlineDatePicker({
   DateTime? lastDate,
   Color? accentColor,
   bool canClear = false,
-  String title = '마감기한 설정',
+  String? title,
 }) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -3734,8 +4256,6 @@ Future<DateTime?> showDeadlineDatePicker({
   bool isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  const weekdaysKo = ['일', '월', '화', '수', '목', '금', '토'];
-
   return showModalBottomSheet<DateTime>(
     context: context,
     useRootNavigator: true,
@@ -3745,6 +4265,12 @@ Future<DateTime?> showDeadlineDatePicker({
     isDismissible: true,
     builder: (sheetCtx) => StatefulBuilder(
       builder: (context, setPickerState) {
+        final s = AppStrings.of(context);
+        final isKo = s.isKo;
+        final weekdays = isKo
+            ? const ['일', '월', '화', '수', '목', '금', '토']
+            : const ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+        final resolvedTitle = title ?? s.deadlineSettingTitle;
         final theme = ThemeController.instance.currentTheme;
         final isDark = theme.isDark;
         final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
@@ -3764,13 +4290,13 @@ Future<DateTime?> showDeadlineDatePicker({
             .inDays;
         String dDayText;
         if (diffDays == 0) {
-          dDayText = '오늘 마감';
+          dDayText = s.deadlineDueToday;
         } else if (diffDays == 1) {
-          dDayText = '내일 마감';
+          dDayText = s.deadlineDueTomorrow;
         } else if (diffDays > 1) {
-          dDayText = 'D-$diffDays';
+          dDayText = s.deadlineDueIn(diffDays);
         } else {
-          dDayText = 'D+${diffDays.abs()} (지남)';
+          dDayText = s.deadlineOverdue(diffDays.abs());
         }
 
         Widget buildQuickChip(String label, DateTime targetDate) {
@@ -3850,7 +4376,7 @@ Future<DateTime?> showDeadlineDatePicker({
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            title,
+                            resolvedTitle,
                             style: GoogleFonts.inter(
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
@@ -3861,7 +4387,9 @@ Future<DateTime?> showDeadlineDatePicker({
                           Row(
                             children: [
                               Text(
-                                '${selectedDate.year}년 ${selectedDate.month}월 ${selectedDate.day}일 (${weekdaysKo[selectedDate.weekday % 7]})',
+                                isKo
+                                    ? '${selectedDate.year}년 ${selectedDate.month}월 ${selectedDate.day}일 (${weekdays[selectedDate.weekday % 7]})'
+                                    : DateFormat('EEE, MMM d, yyyy').format(selectedDate),
                                 style: GoogleFonts.inter(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
@@ -3913,16 +4441,16 @@ Future<DateTime?> showDeadlineDatePicker({
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   child: Row(
                     children: [
-                      buildQuickChip('오늘', today),
-                      buildQuickChip('내일', today.add(const Duration(days: 1))),
-                      buildQuickChip('이번 주말', getThisWeekend(today)),
+                      buildQuickChip(s.quickToday, today),
+                      buildQuickChip(s.quickTomorrow, today.add(const Duration(days: 1))),
+                      buildQuickChip(s.quickThisWeekend, getThisWeekend(today)),
                       buildQuickChip(
-                        '다음 주',
+                        s.quickNextWeek,
                         today.add(Duration(days: ((8 - today.weekday) % 7 == 0 ? 7 : (8 - today.weekday) % 7))),
                       ),
-                      buildQuickChip('+2주', today.add(const Duration(days: 14))),
+                      buildQuickChip(s.quickPlus2Weeks, today.add(const Duration(days: 14))),
                       buildQuickChip(
-                        '+1개월',
+                        s.quickPlus1Month,
                         DateTime(today.year, today.month + 1, today.day),
                       ),
                     ],
@@ -3952,7 +4480,9 @@ Future<DateTime?> showDeadlineDatePicker({
                         ),
                       ),
                       Text(
-                        '${currentMonth.year}년 ${currentMonth.month}월',
+                        isKo
+                            ? '${currentMonth.year}년 ${currentMonth.month}월'
+                            : DateFormat('MMMM yyyy').format(currentMonth),
                         style: GoogleFonts.inter(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
@@ -3977,7 +4507,7 @@ Future<DateTime?> showDeadlineDatePicker({
                   ),
                 ),
 
-                // Weekday Labels (일 월 화 수 목 금 토)
+                // Weekday Labels
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: Row(
@@ -3995,7 +4525,7 @@ Future<DateTime?> showDeadlineDatePicker({
                       return Expanded(
                         child: Center(
                           child: Text(
-                            weekdaysKo[i],
+                            weekdays[i],
                             style: GoogleFonts.inter(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
@@ -4128,7 +4658,7 @@ Future<DateTime?> showDeadlineDatePicker({
                                 padding: EdgeInsets.zero,
                               ),
                               child: Text(
-                                '마감 해제',
+                                s.clearDeadline,
                                 style: GoogleFonts.inter(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w600,
@@ -4159,7 +4689,7 @@ Future<DateTime?> showDeadlineDatePicker({
                               padding: EdgeInsets.zero,
                             ),
                             child: Text(
-                              '설정 완료',
+                              s.doneSetting,
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -4289,7 +4819,7 @@ void showAddCategoryModal(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '새 카테고리',
+                              AppStrings.of(context).categoryAddNew,
                               style: GoogleFonts.inter(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800,
@@ -4299,7 +4829,7 @@ void showAddCategoryModal(
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '주제별로 분류하여 기록을 정리하세요',
+                              AppStrings.of(context).isKo ? '주제별로 분류하여 기록을 정리하세요' : 'Organize records by category',
                               style: GoogleFonts.inter(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w500,
@@ -4352,7 +4882,7 @@ void showAddCategoryModal(
                       }
                     },
                     decoration: InputDecoration(
-                      hintText: '카테고리 이름을 입력하세요',
+                      hintText: AppStrings.of(context).categoryNameHint,
                       hintStyle: GoogleFonts.inter(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w400,
@@ -4403,7 +4933,7 @@ void showAddCategoryModal(
                       Icon(Icons.palette_outlined, size: 14, color: appTextSecondary),
                       const SizedBox(width: 6),
                       Text(
-                        '카테고리 색상',
+                        AppStrings.of(context).categoryColorSelect,
                         style: GoogleFonts.inter(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
@@ -4559,7 +5089,7 @@ void showAddCategoryModal(
                             padding: EdgeInsets.zero,
                           ),
                           child: Text(
-                            '취소',
+                            AppStrings.of(context).commonCancel,
                             style: GoogleFonts.inter(
                               color: appTextSecondary,
                               fontWeight: FontWeight.w600,
@@ -4601,7 +5131,7 @@ void showAddCategoryModal(
                               ),
                             ),
                             child: Text(
-                              '카테고리 생성',
+                              AppStrings.of(context).isKo ? '카테고리 생성' : 'Create Category',
                               style: GoogleFonts.inter(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w700,
@@ -4665,6 +5195,7 @@ class _TopBannerAdWidgetState extends State<TopBannerAdWidget> {
   }
 
   void _loadBannerAd() {
+    if (kIsProVersion) return;
     final adUnitId = AdHelper.bannerAdUnitId;
     if (adUnitId.isEmpty) return;
 
@@ -4701,6 +5232,7 @@ class _TopBannerAdWidgetState extends State<TopBannerAdWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsProVersion) return const SizedBox.shrink();
     if (_isLoaded && _bannerAd != null) {
       return Container(
         width: _bannerAd!.size.width.toDouble(),
@@ -4874,6 +5406,7 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) {
+          final s = AppStrings.of(context);
           final bottomInset = MediaQuery.of(context).viewInsets.bottom;
           final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
           final double effectiveBottom =
@@ -4948,7 +5481,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                           const SizedBox(width: 8),
                           Text(
-                            '새로운 기록',
+                            s.newRecordTitle,
                             style: GoogleFonts.inter(
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
@@ -5094,7 +5627,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             const SizedBox(width: 10),
                             Text(
-                              'TODO로 등록',
+                              s.registerAsTodo,
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -5151,12 +5684,12 @@ class _HomePageState extends State<HomePage> {
                                 Icon(Icons.calendar_today_rounded, size: 14, color: appTextTertiary),
                                 const SizedBox(width: 8),
                                 Text(
-                                  '마감 기한',
+                                  s.dueDate,
                                   style: GoogleFonts.inter(fontSize: 12.5, color: appTextSecondary),
                                 ),
                                 const Spacer(),
                                 Text(
-                                  _targetDate == null ? '날짜 선택' : DateFormat('yyyy.MM.dd').format(_targetDate!),
+                                  _targetDate == null ? s.selectDate : DateFormat('yyyy.MM.dd').format(_targetDate!),
                                   style: GoogleFonts.jetBrainsMono(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -5220,7 +5753,7 @@ class _HomePageState extends State<HomePage> {
                           color: appText,
                         ),
                         decoration: InputDecoration(
-                          hintText: '지금 무슨 일이 일어나고 있나요?',
+                          hintText: s.newRecordHint,
                           hintStyle: GoogleFonts.inter(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w400,
@@ -5285,7 +5818,7 @@ class _HomePageState extends State<HomePage> {
                                     padding: EdgeInsets.zero,
                                   ),
                                   child: Text(
-                                    '취소',
+                                    s.commonCancel,
                                     style: GoogleFonts.inter(
                                       color: appTextSecondary,
                                       fontWeight: FontWeight.w600,
@@ -5318,7 +5851,7 @@ class _HomePageState extends State<HomePage> {
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                     ),
                                     child: Text(
-                                      '기록 완료',
+                                      s.saveRecord,
                                       style: GoogleFonts.inter(
                                         fontSize: 14.5,
                                         fontWeight: FontWeight.w700,
@@ -5395,14 +5928,17 @@ class _HomePageState extends State<HomePage> {
     TimestampEntry? selectedTodo;
 
     // 1. Separate TODOs into categories
+    List<TimestampEntry> inProgressTodos = [];
     List<TimestampEntry> todayTodos = [];
     List<TimestampEntry> futureTodos = [];
     List<TimestampEntry> overdueTodos = [];
     List<TimestampEntry> noDeadlineTodos = [];
 
     for (var entry in widget.entries) {
-      if (entry.status == 'todo') {
-        if (entry.targetDate == null) {
+      if (entry.isPendingTodo) {
+        if (entry.isInProgress) {
+          inProgressTodos.add(entry);
+        } else if (entry.targetDate == null) {
           noDeadlineTodos.add(entry);
         } else {
           if (entry.targetDate!.year == now.year &&
@@ -5419,7 +5955,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     // 2. Sorting Logic
-    // Tie-breaker: creation timestamp (earliest first)
+    inProgressTodos.sort((a, b) => b.currentElapsedSeconds.compareTo(a.currentElapsedSeconds));
     todayTodos.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     // Future: Closest target date first, then earliest creation timestamp
@@ -5432,8 +5968,10 @@ class _HomePageState extends State<HomePage> {
     overdueTodos.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     noDeadlineTodos.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-    // 3. Selection Priority
-    if (todayTodos.isNotEmpty) {
+    // 3. Selection Priority (In Progress tasks have top priority)
+    if (inProgressTodos.isNotEmpty) {
+      selectedTodo = inProgressTodos.first;
+    } else if (todayTodos.isNotEmpty) {
       selectedTodo = todayTodos.first;
     } else if (futureTodos.isNotEmpty) {
       selectedTodo = futureTodos.first;
@@ -5486,6 +6024,7 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
+    final isKo = AppStrings.of(context).isKo;
     final bool hasDeadline = selectedTodo.targetDate != null;
     final diff = hasDeadline
         ? selectedTodo.targetDate!.difference(now)
@@ -5498,18 +6037,20 @@ class _HomePageState extends State<HomePage> {
     final s = absDuration.inSeconds % 60;
 
     final timeStr = hasDeadline
-        ? '${h > 0 ? '$h시간 ' : ''}${m}분 ${s}초'
-        : '기한 없음';
+        ? (isKo
+            ? '${h > 0 ? '$h시간 ' : ''}${m}분 ${s}초'
+            : '${h > 0 ? '${h}h ' : ''}${m}m ${s}s')
+        : (isKo ? '기한 없음' : 'No deadline');
 
     final statusText = !hasDeadline
         ? 'TODO'
         : isOverdue
-        ? '마감 지남'
-        : '마감 임박';
+        ? (isKo ? '마감 지남' : 'OVERDUE')
+        : (isKo ? '마감 임박' : 'DUE SOON');
 
     final noteText = selectedTodo.note.isNotEmpty
         ? selectedTodo.note
-        : '이름 없는 TODO';
+        : (isKo ? '이름 없는 TODO' : 'Untitled task');
 
     final mainColor = !hasDeadline
         ? widget.getCategoryColor(selectedTodo.category).withOpacity(0.5)
@@ -5552,8 +6093,10 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 4),
         Text(
           hasDeadline
-              ? (isOverdue ? '$timeStr 지남' : '$timeStr 남음')
-              : '기한 없음',
+              ? (isOverdue
+                  ? (isKo ? '$timeStr 지남' : '$timeStr overdue')
+                  : (isKo ? '$timeStr 남음' : '$timeStr left'))
+              : (isKo ? '기한 없음' : 'No deadline'),
           style: GoogleFonts.inter(
             fontSize: 10 * widget.uiScale,
             color: isAppDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
@@ -5567,8 +6110,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentTheme = ThemeController.instance.currentTheme;
+    final themeAccent = currentTheme.accent;
     final filteredEntries = _showOnlyTodo
-        ? widget.entries.where((e) => e.status == 'todo').toList()
+        ? widget.entries.where((e) => e.isPendingTodo).toList()
         : widget.entries;
     final int itemCount = filteredEntries.length.clamp(0, _displayedItemCount);
     final bottomInset = 150.0 + MediaQuery.of(context).padding.bottom;
@@ -5674,13 +6219,14 @@ class _HomePageState extends State<HomePage> {
                       ),
                       decoration: BoxDecoration(
                         color: _showOnlyTodo
-                            ? widget.getCategoryColor(_selectedCategory).withOpacity(0.12)
-                            : appSubtleBg,
+                            ? themeAccent.withOpacity(0.14)
+                            : themeAccent.withOpacity(0.06),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: _showOnlyTodo
-                              ? widget.getCategoryColor(_selectedCategory).withOpacity(0.35)
-                              : appBorder,
+                              ? themeAccent.withOpacity(0.45)
+                              : themeAccent.withOpacity(0.22),
+                          width: _showOnlyTodo ? 1.2 : 0.9,
                         ),
                       ),
                       child: Row(
@@ -5689,23 +6235,25 @@ class _HomePageState extends State<HomePage> {
                           Icon(
                             _showOnlyTodo
                                 ? Icons.filter_list_rounded
-                                : Icons.filter_list_off_rounded,
-                            size: 14,
+                                : Icons.checklist_rounded,
+                            size: 14 * widget.uiScale,
                             color: _showOnlyTodo
-                                ? widget.getCategoryColor(_selectedCategory)
-                                : appTextTertiary,
+                                ? themeAccent
+                                : themeAccent.withOpacity(0.85),
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'TODO 모아보기',
+                            AppStrings.of(context).viewTasks,
                             style: GoogleFonts.inter(
                               fontSize: 9.5 * widget.uiScale,
                               fontWeight: _showOnlyTodo
                                   ? FontWeight.bold
                                   : FontWeight.w600,
                               color: _showOnlyTodo
-                                  ? widget.getCategoryColor(_selectedCategory)
-                                  : appTextSecondary,
+                                  ? themeAccent
+                                  : (currentTheme.isDark
+                                      ? Colors.white.withOpacity(0.9)
+                                      : const Color(0xFF1E293B)),
                               letterSpacing: 0.2,
                             ),
                           ),
@@ -5754,7 +6302,7 @@ class _HomePageState extends State<HomePage> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            '카드를 왼쪽으로 스와이프하면 삭제할 수 있어요',
+                            AppStrings.of(context).swipeGuideText,
                             style: GoogleFonts.inter(
                               color: appText,
                               fontSize: 12 * widget.uiScale,
@@ -5793,7 +6341,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '기록된 순간이 없습니다',
+                        AppStrings.of(context).isKo ? '기록된 순간이 없습니다' : 'No entries recorded yet',
                         style: GoogleFonts.inter(
                           color: appTextTertiary,
                           fontSize: 15,
@@ -5804,7 +6352,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               )
             else if (_showOnlyTodo &&
-                !widget.entries.any((e) => e.status == 'todo'))
+                !widget.entries.any((e) => e.isPendingTodo))
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
@@ -5818,7 +6366,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '대기 중인 TODO가 없습니다',
+                        AppStrings.of(context).isKo ? '대기 중인 TODO가 없습니다' : 'No pending tasks',
                         style: GoogleFonts.inter(
                           color: appTextTertiary,
                           fontSize: 15,
@@ -5935,21 +6483,97 @@ void _showFullScreenImagePreview(BuildContext context, String imagePath) {
   );
 }
 
+/// 둥근 직사각형 점선 테두리 페인터
+class DashedRRectPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+  final double radius;
+  final double dashWidth;
+  final double dashGap;
+  final double phase; // 0.0 ~ 1.0 (흐르는 애니메이션)
+
+  const DashedRRectPainter({
+    required this.color,
+    this.strokeWidth = 1.5,
+    this.radius = 20.0,
+    this.dashWidth = 5.0,
+    this.dashGap = 3.5,
+    this.phase = 0.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (color.opacity == 0 || strokeWidth <= 0) return;
+
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final halfStroke = strokeWidth / 2;
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        halfStroke,
+        halfStroke,
+        math.max(0.0, size.width - strokeWidth),
+        math.max(0.0, size.height - strokeWidth),
+      ),
+      Radius.circular(math.max(0.0, radius - halfStroke)),
+    );
+
+    final path = Path()..addRRect(rrect);
+    final dashedPath = Path();
+    final cycle = dashWidth + dashGap;
+    if (cycle <= 0) return;
+
+    final offset = (phase * cycle) % cycle;
+
+    for (final metric in path.computeMetrics()) {
+      double distance = offset - cycle;
+      while (distance < metric.length) {
+        final start = math.max(0.0, distance);
+        final end = math.min(metric.length, distance + dashWidth);
+        if (start < end) {
+          dashedPath.addPath(
+            metric.extractPath(start, end),
+            Offset.zero,
+          );
+        }
+        distance += cycle;
+      }
+    }
+
+    canvas.drawPath(dashedPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant DashedRRectPainter oldDelegate) {
+    return color != oldDelegate.color ||
+        strokeWidth != oldDelegate.strokeWidth ||
+        radius != oldDelegate.radius ||
+        dashWidth != oldDelegate.dashWidth ||
+        dashGap != oldDelegate.dashGap ||
+        phase != oldDelegate.phase;
+  }
+}
+
 class _TimestampListItemState extends State<TimestampListItem> with SingleTickerProviderStateMixin {
   late bool _isExpanded;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
+  bool _isTimelineExpanded = true;
+  late AnimationController _borderFlowController;
 
   @override
   void initState() {
     super.initState();
     _isExpanded = widget.initialExpanded;
-    _pulseController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1500))
-      ..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _borderFlowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
     );
+    if (widget.entry.isInProgress) {
+      _borderFlowController.repeat();
+    }
   }
 
   @override
@@ -5958,12 +6582,230 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
     if (widget.initialExpanded != oldWidget.initialExpanded) {
       _isExpanded = widget.initialExpanded;
     }
+    if (widget.entry.isInProgress && !_borderFlowController.isAnimating) {
+      _borderFlowController.repeat();
+    } else if (!widget.entry.isInProgress && _borderFlowController.isAnimating) {
+      _borderFlowController.stop();
+    }
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
+    _borderFlowController.dispose();
     super.dispose();
+  }
+
+  void _startProgress() {
+    HapticFeedback.mediumImpact();
+    _borderFlowController.repeat();
+    final now = DateTime.now();
+    final updatedSessions = List<TimeSegment>.from(widget.entry.workSessions)
+      ..add(TimeSegment(start: now));
+    final updated = widget.entry.copyWith(
+      status: 'in_progress',
+      startedTimestamp: widget.entry.startedTimestamp ?? now,
+      lastResumedTimestamp: now,
+      workSessions: updatedSessions,
+    );
+    widget.onUpdate?.call(updated);
+  }
+
+  void _pauseProgress() {
+    HapticFeedback.lightImpact();
+    _borderFlowController.stop();
+    final now = DateTime.now();
+    final updatedSessions = List<TimeSegment>.from(widget.entry.workSessions);
+    if (updatedSessions.isNotEmpty && updatedSessions.last.end == null) {
+      updatedSessions[updatedSessions.length - 1] =
+          updatedSessions.last.copyWith(end: now);
+    } else {
+      final start = widget.entry.lastResumedTimestamp ?? widget.entry.startedTimestamp ?? now;
+      updatedSessions.add(TimeSegment(start: start, end: now));
+    }
+    int totalSec = 0;
+    for (final s in updatedSessions) {
+      if (s.end != null) totalSec += s.end!.difference(s.start).inSeconds;
+    }
+    final updated = widget.entry.copyWith(
+      status: 'paused',
+      totalActiveSeconds: totalSec,
+      workSessions: updatedSessions,
+      clearLastResumedTimestamp: true,
+    );
+    widget.onUpdate?.call(updated);
+  }
+
+  void _resumeProgress() {
+    HapticFeedback.mediumImpact();
+    _borderFlowController.repeat();
+    final now = DateTime.now();
+    final updatedSessions = List<TimeSegment>.from(widget.entry.workSessions)
+      ..add(TimeSegment(start: now));
+    final updated = widget.entry.copyWith(
+      status: 'in_progress',
+      lastResumedTimestamp: now,
+      workSessions: updatedSessions,
+    );
+    widget.onUpdate?.call(updated);
+  }
+
+  Widget _buildWorkSessionsTimeline(Color color, bool isDark) {
+    if (widget.entry.workSessions.isEmpty && !widget.entry.isManualDuration) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _isTimelineExpanded = !_isTimelineExpanded),
+              child: Row(
+                children: [
+                  Icon(Icons.timeline_rounded, size: 12, color: color),
+                  const SizedBox(width: 4),
+                  Text(
+                    AppStrings.of(context).milestoneTitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 10 * widget.uiScale,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                  if (widget.entry.isManualDuration) ...[
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: color.withOpacity(0.3), width: 0.8),
+                      ),
+                      child: Text(
+                        AppStrings.of(context).manualInputBadge,
+                        style: GoogleFonts.inter(
+                          fontSize: 8.5 * widget.uiScale,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (widget.entry.effectiveDurationSeconds > 0) ...[
+                    const Spacer(),
+                    Text(
+                      '${AppStrings.of(context).totalDurationPrefix}${formatSecondsKo(widget.entry.effectiveDurationSeconds)}',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 9.5 * widget.uiScale,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  ] else ...[
+                    const Spacer(),
+                  ],
+                  const SizedBox(width: 4),
+                  Icon(
+                    _isTimelineExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 14 * widget.uiScale,
+                    color: color.withOpacity(0.8),
+                  ),
+                ],
+              ),
+            ),
+            if (_isTimelineExpanded) ...[
+              const SizedBox(height: 5),
+              ...widget.entry.workSessions.asMap().entries.map((item) {
+                final idx = item.key + 1;
+                final seg = item.value;
+                final sameDay = seg.end == null ||
+                    (seg.start.year == seg.end!.year &&
+                        seg.start.month == seg.end!.month &&
+                        seg.start.day == seg.end!.day);
+                final startStr = sameDay
+                    ? DateFormat('HH:mm:ss').format(seg.start)
+                    : DateFormat('M/d HH:mm:ss').format(seg.start);
+                final endStr = seg.end != null
+                    ? (sameDay
+                        ? DateFormat('HH:mm:ss').format(seg.end!)
+                        : DateFormat('M/d HH:mm:ss').format(seg.end!))
+                    : AppStrings.of(context).milestoneInProgress;
+                final durationDiff = seg.end != null ? seg.end!.difference(seg.start) : null;
+                final durStr = durationDiff != null ? ' (${formatDurationKo(durationDiff)})' : '';
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                  child: Row(
+                    children: [
+                      Text(
+                        AppStrings.of(context).milestoneLap(idx),
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 9.5 * widget.uiScale,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '$startStr ~ $endStr$durStr',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9.5 * widget.uiScale,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              if (widget.entry.isManualDuration)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_note_rounded, size: 11 * widget.uiScale, color: color),
+                      const SizedBox(width: 4),
+                      Text(
+                        AppStrings.of(context).manualInputDurationLabel,
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 9.5 * widget.uiScale,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          formatSecondsKo(widget.entry.effectiveDurationSeconds),
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9.5 * widget.uiScale,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   String _getDurationString(DateTime start, DateTime end) {
@@ -5987,7 +6829,6 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
       final hsl = HSLColor.fromColor(widget.categoryColor);
       return hsl.withLightness((hsl.lightness - 0.08).clamp(0.0, 1.0)).toColor();
     }
-    // TODO와 일반 항목은 동일한 카테고리 색상
     return widget.categoryColor;
   }
 
@@ -6041,15 +6882,19 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
     final bool hasImage = widget.entry.imagePath != null || widget.entry.doneImagePath != null;
     final bool hasLongText = widget.entry.note.contains('\n') || widget.entry.note.length > 30;
     final bool hasDoneExtra = widget.entry.doneNote != null && widget.entry.doneNote!.isNotEmpty;
-    final bool isExpandable = hasImage || hasLongText || hasDoneExtra;
+    final bool hasWorkSessions = widget.entry.workSessions.isNotEmpty || widget.entry.isManualDuration;
+    final bool isExpandable = hasImage || hasLongText || hasDoneExtra || hasWorkSessions;
 
     final currentTheme = ThemeController.instance.currentTheme;
     final isDark = currentTheme.isDark;
     final adjustedColor = _getAdjustedColor();
     final isDone = widget.entry.status == 'done';
     final isTodo = widget.entry.status == 'todo';
+    final isInProgress = widget.entry.isInProgress;
+    final isPaused = widget.entry.isPaused;
+    final isPendingTodo = widget.entry.isPendingTodo;
     final isNormal = widget.entry.status == 'none';
-    final bool showStartPrefix = isTodo || isDone || widget.entry.computedDurationMinutes != null;
+    final bool showStartPrefix = isPendingTodo || isDone || widget.entry.computedDurationMinutes != null;
 
     return Dismissible(
       key: ValueKey(widget.entry.id),
@@ -6071,7 +6916,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
             const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
             const SizedBox(width: 6),
             Text(
-              '삭제',
+              AppStrings.of(context).commonDelete,
               style: GoogleFonts.inter(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -6085,38 +6930,52 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
       child: GestureDetector(
         onTap: isExpandable ? () => setState(() => _isExpanded = !_isExpanded) : null,
         child: AnimatedBuilder(
-          animation: _pulseAnimation,
+          animation: _borderFlowController,
           builder: (context, child) {
-            final pulseValue = isTodo ? _pulseAnimation.value : 1.0;
+            final isDashed = isInProgress || isPaused;
             return Container(
               margin: EdgeInsets.only(bottom: 10 * widget.uiScale),
-              padding: EdgeInsets.symmetric(
-                horizontal: 13 * widget.uiScale,
-                vertical: 10 * widget.uiScale,
-              ),
-              decoration: BoxDecoration(
-                color: currentTheme.cardBg,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDone
-                      ? adjustedColor.withOpacity(isDark ? 0.42 : 0.6)
-                      : (isDark ? adjustedColor.withOpacity(0.24) : const Color(0xFFE2E8F0)),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isDark ? Colors.black.withOpacity(0.18) : Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+              child: CustomPaint(
+                foregroundPainter: isDashed
+                    ? DashedRRectPainter(
+                        color: adjustedColor.withOpacity(isDark ? 0.8 : 0.9),
+                        strokeWidth: 1.6,
+                        radius: 20,
+                        dashWidth: 7.5,
+                        dashGap: 4.5,
+                        phase: isInProgress ? _borderFlowController.value : 0.0,
+                      )
+                    : null,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 13 * widget.uiScale,
+                    vertical: 10 * widget.uiScale,
                   ),
-                  BoxShadow(
-                    color: adjustedColor.withOpacity(isDone ? 0.08 : 0.04),
-                    blurRadius: 12,
-                    spreadRadius: -2,
+                  decoration: BoxDecoration(
+                    color: currentTheme.cardBg,
+                    borderRadius: BorderRadius.circular(20),
+                    border: isDashed
+                        ? null
+                        : Border.all(
+                            color: isDone
+                                ? adjustedColor.withOpacity(isDark ? 0.42 : 0.6)
+                                : (isDark ? adjustedColor.withOpacity(0.24) : const Color(0xFFE2E8F0)),
+                            width: 1.2,
+                          ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark ? Colors.black.withOpacity(0.18) : Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: adjustedColor.withOpacity(isDone ? 0.08 : (isInProgress ? 0.08 : 0.04)),
+                        blurRadius: 12,
+                        spreadRadius: -2,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Column(
+                  child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 1. Full-width Category & Date Header Row (Right to the edge!)
@@ -6186,7 +7045,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                '사진',
+                                AppStrings.of(context).badgePhoto,
                                 style: GoogleFonts.inter(
                                   fontSize: 8.5 * widget.uiScale,
                                   fontWeight: FontWeight.w600,
@@ -6197,7 +7056,12 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                           ),
                         ),
                       ],
-                      if (isTodo) ...[
+                      if (isInProgress || isPaused) ...[
+                        if (widget.entry.targetDate != null) ...[
+                          const SizedBox(width: 5),
+                          _buildDDayBadge(widget.entry.targetDate!, adjustedColor, compact: true),
+                        ],
+                      ] else if (isTodo) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -6224,56 +7088,39 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                         ],
                       ] else if (isDone) ...[
                         const SizedBox(width: 8),
-                        if (widget.entry.doneTimestamp != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: adjustedColor.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.timer_outlined,
-                                  size: 9.5 * widget.uiScale,
-                                  color: adjustedColor.withOpacity(0.9),
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${_getDurationString(widget.entry.timestamp, widget.entry.doneTimestamp!)} 소요',
-                                  style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 8.5 * widget.uiScale,
-                                    fontWeight: FontWeight.w600,
-                                    color: adjustedColor.withOpacity(0.9),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'DONE',
-                              style: GoogleFonts.inter(
-                                fontSize: 8.5 * widget.uiScale,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
-                                letterSpacing: 0.5,
-                              ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: adjustedColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: adjustedColor.withOpacity(0.25),
+                              width: 0.8,
                             ),
                           ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.timer_outlined,
+                                size: 9.5 * widget.uiScale,
+                                color: adjustedColor.withOpacity(0.9),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${formatSecondsKo(widget.entry.effectiveDurationSeconds)}${AppStrings.of(context).spentDurationSuffix}',
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 8.5 * widget.uiScale,
+                                  fontWeight: FontWeight.w600,
+                                  color: adjustedColor.withOpacity(0.9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                       const Spacer(),
                       Text(
@@ -6286,35 +7133,14 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Top Right Action Button
-                      if (isTodo)
+                      // Top Right (Done check circle or options)
+                      if (isDone)
                         GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: widget.readOnly ? null : widget.onStatusToggle,
                           child: Container(
-                            width: 24,
-                            height: 24,
-                            alignment: Alignment.center,
-                            child: Container(
-                              width: 18,
-                              height: 18,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: adjustedColor.withOpacity(0.85),
-                                  width: 1.8,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      else if (isDone)
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: widget.readOnly ? null : widget.onStatusToggle,
-                          child: Container(
-                            width: 24,
-                            height: 24,
+                            width: 22,
+                            height: 22,
                             alignment: Alignment.center,
                             child: Container(
                               width: 18,
@@ -6398,7 +7224,9 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          widget.entry.note.isEmpty ? (hasImage ? '사진 메모' : '기록된 순간') : widget.entry.note,
+                          widget.entry.note.isEmpty
+                              ? (hasImage ? (AppStrings.of(context).isKo ? '사진 메모' : 'Photo memo') : (AppStrings.of(context).isKo ? '기록된 순간' : 'Recorded moment'))
+                              : widget.entry.note,
                           style: GoogleFonts.inter(
                             color: isDone
                                 ? (isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF64748B))
@@ -6510,7 +7338,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                             child: Text(
                               (widget.entry.doneNote != null && widget.entry.doneNote!.trim().isNotEmpty)
                                   ? widget.entry.doneNote!
-                                  : (widget.entry.note.isEmpty ? (hasImage ? '사진 메모' : '완료됨') : widget.entry.note),
+                                  : (widget.entry.note.isEmpty ? (hasImage ? (AppStrings.of(context).isKo ? '사진 메모' : 'Photo memo') : AppStrings.of(context).commonDone) : widget.entry.note),
                               style: GoogleFonts.inter(
                                 color: isDark ? Colors.white.withOpacity(0.85) : const Color(0xFF1E293B),
                                 fontSize: 13.5 * widget.uiScale,
@@ -6571,7 +7399,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${_formatDurationMinutes(widget.entry.computedDurationMinutes!)} 소요',
+                          '${formatSecondsKo(widget.entry.effectiveDurationSeconds)}${AppStrings.of(context).spentDurationSuffix}',
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 9.5 * widget.uiScale,
                             fontWeight: FontWeight.w600,
@@ -6598,10 +7426,152 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                         ),
                       ),
                     ),
+
+                  // Work Sessions Milestone Timeline (시각화)
+                  if ((widget.entry.workSessions.isNotEmpty || widget.entry.isManualDuration) && _isExpanded)
+                    _buildWorkSessionsTimeline(adjustedColor, isDark),
+
+                  // 5. Action Buttons (Right-aligned at bottom: 착수 / 일시정지 / 계속하기 + 완료)
+                  if (isPendingTodo && !widget.readOnly) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (isInProgress) ...[
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _pauseProgress,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10 * widget.uiScale,
+                                vertical: 5 * widget.uiScale,
+                              ),
+                              decoration: BoxDecoration(
+                                color: adjustedColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: adjustedColor.withOpacity(0.35), width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.pause_rounded, size: 13 * widget.uiScale, color: adjustedColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    AppStrings.of(context).actionPause,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11 * widget.uiScale,
+                                      fontWeight: FontWeight.w700,
+                                      color: adjustedColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ] else if (isPaused) ...[
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _resumeProgress,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10 * widget.uiScale,
+                                vertical: 5 * widget.uiScale,
+                              ),
+                              decoration: BoxDecoration(
+                                color: adjustedColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: adjustedColor.withOpacity(0.4), width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.play_arrow_rounded, size: 14 * widget.uiScale, color: adjustedColor),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    AppStrings.of(context).actionResume,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11 * widget.uiScale,
+                                      fontWeight: FontWeight.w700,
+                                      color: adjustedColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ] else if (isTodo) ...[
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _startProgress,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10 * widget.uiScale,
+                                vertical: 5 * widget.uiScale,
+                              ),
+                              decoration: BoxDecoration(
+                                color: adjustedColor.withOpacity(0.14),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: adjustedColor.withOpacity(0.4), width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.play_arrow_rounded, size: 14 * widget.uiScale, color: adjustedColor),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    AppStrings.of(context).actionStart,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11 * widget.uiScale,
+                                      fontWeight: FontWeight.w700,
+                                      color: adjustedColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: widget.onStatusToggle,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 11 * widget.uiScale,
+                              vertical: 5 * widget.uiScale,
+                            ),
+                            decoration: BoxDecoration(
+                              color: adjustedColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_rounded, size: 13 * widget.uiScale, color: Colors.white),
+                                const SizedBox(width: 3),
+                                Text(
+                                  AppStrings.of(context).actionDone,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11 * widget.uiScale,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
-            );
-          },
+            ),
+          ),
+        );
+      },
         ),
       ),
     );
@@ -6655,7 +7625,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '기록 삭제',
+                        AppStrings.of(context).deleteConfirmTitle,
                         style: GoogleFonts.inter(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
@@ -6667,7 +7637,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    '이 기록을 정말 삭제하시겠습니까?\n삭제된 내용은 복구할 수 없습니다.',
+                    AppStrings.of(context).deleteConfirmDesc,
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       height: 1.4,
@@ -6713,7 +7683,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                             padding: EdgeInsets.zero,
                           ),
                           child: Text(
-                            '취소',
+                            AppStrings.of(context).commonCancel,
                             style: GoogleFonts.inter(
                               color: appTextSecondary,
                               fontWeight: FontWeight.w600,
@@ -6737,7 +7707,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                               ),
                             ),
                             child: Text(
-                              '삭제',
+                              AppStrings.of(context).commonDelete,
                               style: GoogleFonts.inter(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 14.5,
@@ -6760,7 +7730,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
 
   void _showEntryOptionsSheet(BuildContext context, Color adjustedColor) {
     String selectedCategory = widget.entry.category;
-    bool isTodo = widget.entry.status == 'todo';
+    bool isTodo = widget.entry.isPendingTodo;
     DateTime? targetDate = widget.entry.targetDate;
     String? selectedImagePath = widget.entry.imagePath;
 
@@ -6921,7 +7891,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '기록 수정',
+                              AppStrings.of(context).editEntryTitle,
                               style: GoogleFonts.inter(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800,
@@ -7034,7 +8004,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'TODO로 등록',
+                                AppStrings.of(context).registerAsTodo,
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -7073,12 +8043,12 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                   Icon(Icons.calendar_today_rounded, size: 14, color: appTextTertiary),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '마감 기한',
+                                    AppStrings.of(context).dueDate,
                                     style: GoogleFonts.inter(fontSize: 12.5, color: appTextSecondary),
                                   ),
                                   const Spacer(),
                                   Text(
-                                    targetDate == null ? '날짜 선택' : DateFormat('yyyy.MM.dd').format(targetDate!),
+                                    targetDate == null ? AppStrings.of(context).selectDate : DateFormat('yyyy.MM.dd').format(targetDate!),
                                     style: GoogleFonts.jetBrainsMono(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
@@ -7110,7 +8080,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                     Icon(Icons.timer_outlined, size: 15, color: appTextTertiary),
                                     const SizedBox(width: 8),
                                     Text(
-                                      '소요 시간 (통계용)',
+                                      AppStrings.of(context).spentTimeForStats,
                                       style: GoogleFonts.inter(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w600,
@@ -7120,8 +8090,8 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                     const Spacer(),
                                     Text(
                                       (hours * 60 + minutes) > 0
-                                          ? '${hours > 0 ? "${hours}시간 " : ""}${minutes}분'
-                                          : '미설정',
+                                          ? '${hours > 0 ? "$hours${AppStrings.of(context).unitHour} " : ""}$minutes${AppStrings.of(context).unitMinute}'
+                                          : AppStrings.of(context).notSet,
                                       style: GoogleFonts.jetBrainsMono(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
@@ -7165,7 +8135,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                                 },
                                               ),
                                             ),
-                                            Text('시간', style: GoogleFonts.inter(fontSize: 11.5, color: appTextTertiary)),
+                                            Text(AppStrings.of(context).unitHour, style: GoogleFonts.inter(fontSize: 11.5, color: appTextTertiary)),
                                           ],
                                         ),
                                       ),
@@ -7203,7 +8173,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                                 },
                                               ),
                                             ),
-                                            Text('분', style: GoogleFonts.inter(fontSize: 11.5, color: appTextTertiary)),
+                                            Text(AppStrings.of(context).unitMinute, style: GoogleFonts.inter(fontSize: 11.5, color: appTextTertiary)),
                                           ],
                                         ),
                                       ),
@@ -7216,15 +8186,15 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                   physics: const BouncingScrollPhysics(),
                                   child: Row(
                                     children: [
-                                      _buildPresetChip('+15분', () => addMinutes(15), activeCategoryColor),
+                                      _buildPresetChip('+15${AppStrings.of(context).unitMinute}', () => addMinutes(15), activeCategoryColor),
                                       const SizedBox(width: 6),
-                                      _buildPresetChip('+30분', () => addMinutes(30), activeCategoryColor),
+                                      _buildPresetChip('+30${AppStrings.of(context).unitMinute}', () => addMinutes(30), activeCategoryColor),
                                       const SizedBox(width: 6),
-                                      _buildPresetChip('+1시간', () => addMinutes(60), activeCategoryColor),
+                                      _buildPresetChip('+1${AppStrings.of(context).unitHour}', () => addMinutes(60), activeCategoryColor),
                                       const SizedBox(width: 6),
-                                      _buildPresetChip('+2시간', () => addMinutes(120), activeCategoryColor),
+                                      _buildPresetChip('+2${AppStrings.of(context).unitHour}', () => addMinutes(120), activeCategoryColor),
                                       const SizedBox(width: 6),
-                                      _buildPresetChip('초기화', resetTime, appTextTertiary, isOutline: true),
+                                      _buildPresetChip(AppStrings.of(context).resetPreset, resetTime, appTextTertiary, isOutline: true),
                                     ],
                                   ),
                                 ),
@@ -7289,7 +8259,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                             color: appText,
                           ),
                           decoration: InputDecoration(
-                            hintText: '지금 무슨 일이 일어나고 있나요?',
+                            hintText: AppStrings.of(context).editEntryNoteHintQuick,
                             hintStyle: GoogleFonts.inter(
                               fontSize: 13.5,
                               fontWeight: FontWeight.w400,
@@ -7350,7 +8320,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                       padding: EdgeInsets.zero,
                                     ),
                                     child: Text(
-                                      '취소',
+                                      AppStrings.of(context).commonCancel,
                                       style: GoogleFonts.inter(
                                         color: appTextSecondary,
                                         fontWeight: FontWeight.w600,
@@ -7368,15 +8338,24 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                           ? () {
                                               final totalMins = (hours * 60) + minutes;
                                               if (widget.onUpdate != null) {
+                                                final String resolvedStatus = widget.entry.isDone
+                                                    ? 'done'
+                                                    : (widget.entry.isInProgress
+                                                        ? (isTodo ? 'in_progress' : 'none')
+                                                        : (widget.entry.isPaused
+                                                            ? (isTodo ? 'paused' : 'none')
+                                                            : (isTodo ? 'todo' : 'none')));
                                                 widget.onUpdate!(widget.entry.copyWith(
                                                   note: editNoteController.text.trim(),
                                                   category: selectedCategory,
-                                                  status: isTodo ? 'todo' : 'none',
+                                                  status: resolvedStatus,
                                                   targetDate: isTodo ? targetDate : null,
                                                   imagePath: selectedImagePath,
                                                   clearImage: selectedImagePath == null,
-                                                  manualDurationMinutes: (!isTodo && totalMins > 0) ? totalMins : null,
-                                                  clearManualDuration: isTodo || totalMins <= 0,
+                                                  manualDurationMinutes: (!isTodo && totalMins > 0)
+                                                      ? totalMins
+                                                      : (widget.entry.isDone && totalMins > 0 ? totalMins : null),
+                                                  clearManualDuration: (!isTodo && totalMins <= 0) || (widget.entry.isDone && totalMins <= 0),
                                                 ));
                                               }
                                               Navigator.pop(ctx);
@@ -7397,7 +8376,7 @@ class _TimestampListItemState extends State<TimestampListItem> with SingleTicker
                                         ),
                                       ),
                                       child: Text(
-                                        '기록 수정 완료',
+                                        AppStrings.of(context).editEntrySave,
                                         style: GoogleFonts.inter(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w700,
@@ -7667,7 +8646,7 @@ class _CategoryViewState extends State<CategoryView> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '카테고리 삭제',
+                        AppStrings.of(context).categoryDeleteTitle,
                         style: GoogleFonts.inter(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
@@ -7679,7 +8658,9 @@ class _CategoryViewState extends State<CategoryView> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    '"$cat" 카테고리와 연관된 모든 기록이 함께 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.',
+                    AppStrings.of(context).isKo
+                        ? '"$cat" 카테고리와 연관된 모든 기록이 함께 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.'
+                        : 'All records associated with "$cat" will be deleted.\nThis action cannot be undone.',
                     style: GoogleFonts.inter(
                       fontSize: 13.5,
                       height: 1.45,
@@ -7703,7 +8684,7 @@ class _CategoryViewState extends State<CategoryView> {
                             padding: EdgeInsets.zero,
                           ),
                           child: Text(
-                            '취소',
+                            AppStrings.of(context).commonCancel,
                             style: GoogleFonts.inter(
                               color: appTextSecondary,
                               fontWeight: FontWeight.w600,
@@ -7730,7 +8711,7 @@ class _CategoryViewState extends State<CategoryView> {
                               ),
                             ),
                             child: Text(
-                              '삭제',
+                              AppStrings.of(context).commonDelete,
                               style: GoogleFonts.inter(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 14.5,
@@ -7765,6 +8746,7 @@ class _CategoryViewState extends State<CategoryView> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            final isKo = AppStrings.of(context).isKo;
             return Container(
               decoration: BoxDecoration(
                 color: appCardBg,
@@ -7814,7 +8796,7 @@ class _CategoryViewState extends State<CategoryView> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '카테고리 이름 변경',
+                          isKo ? '카테고리 이름 변경' : 'Rename Category',
                           style: GoogleFonts.inter(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
@@ -7842,7 +8824,7 @@ class _CategoryViewState extends State<CategoryView> {
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      '새 카테고리 이름',
+                      isKo ? '새 카테고리 이름' : 'New Category Name',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -7859,7 +8841,7 @@ class _CategoryViewState extends State<CategoryView> {
                         fontWeight: FontWeight.w600,
                       ),
                       decoration: InputDecoration(
-                        hintText: '카테고리 이름을 입력하세요',
+                        hintText: AppStrings.of(context).categoryNameHint,
                         hintStyle: GoogleFonts.inter(color: appTextTertiary),
                         filled: true,
                         fillColor: appSubtleBg,
@@ -7878,9 +8860,9 @@ class _CategoryViewState extends State<CategoryView> {
                       onChanged: (val) {
                         final trimmed = val.trim();
                         if (trimmed.isEmpty) {
-                          setSheetState(() => errorText = '이름을 입력해주세요.');
+                          setSheetState(() => errorText = isKo ? '이름을 입력해주세요.' : 'Please enter a name.');
                         } else if (trimmed != currentName && widget.categories.contains(trimmed)) {
-                          setSheetState(() => errorText = '이미 존재하는 카테고리 이름입니다.');
+                          setSheetState(() => errorText = isKo ? '이미 존재하는 카테고리 이름입니다.' : 'Category already exists.');
                         } else {
                           if (errorText != null) {
                             setSheetState(() => errorText = null);
@@ -7905,7 +8887,7 @@ class _CategoryViewState extends State<CategoryView> {
                               padding: EdgeInsets.zero,
                             ),
                             child: Text(
-                              '취소',
+                              AppStrings.of(context).commonCancel,
                               style: GoogleFonts.inter(
                                 color: appTextSecondary,
                                 fontWeight: FontWeight.w600,
@@ -7922,11 +8904,11 @@ class _CategoryViewState extends State<CategoryView> {
                               onPressed: () {
                                 final newName = nameController.text.trim();
                                 if (newName.isEmpty) {
-                                  setSheetState(() => errorText = '이름을 입력해주세요.');
+                                  setSheetState(() => errorText = isKo ? '이름을 입력해주세요.' : 'Please enter a name.');
                                   return;
                                 }
                                 if (newName != currentName && widget.categories.contains(newName)) {
-                                  setSheetState(() => errorText = '이미 존재하는 카테고리 이름입니다.');
+                                  setSheetState(() => errorText = isKo ? '이미 존재하는 카테고리 이름입니다.' : 'Category already exists.');
                                   return;
                                 }
 
@@ -7942,7 +8924,7 @@ class _CategoryViewState extends State<CategoryView> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
                               child: Text(
-                                '저장',
+                                AppStrings.of(context).commonSave,
                                 style: GoogleFonts.inter(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 14.5,
@@ -8039,7 +9021,7 @@ class _CategoryViewState extends State<CategoryView> {
                   ListTile(
                     leading: Icon(Icons.edit_outlined, color: appTextSecondary, size: 20),
                     title: Text(
-                      '이름 변경',
+                      AppStrings.of(context).isKo ? '이름 변경' : 'Rename',
                       style: GoogleFonts.inter(color: appText, fontSize: 14.5, fontWeight: FontWeight.w600),
                     ),
                     contentPadding: EdgeInsets.zero,
@@ -8052,7 +9034,7 @@ class _CategoryViewState extends State<CategoryView> {
                   ListTile(
                     leading: Icon(Icons.palette_outlined, color: color, size: 20),
                     title: Text(
-                      '색상 변경',
+                      AppStrings.of(context).isKo ? '색상 변경' : 'Change Color',
                       style: GoogleFonts.inter(color: appText, fontSize: 14.5, fontWeight: FontWeight.w600),
                     ),
                     contentPadding: EdgeInsets.zero,
@@ -8072,7 +9054,7 @@ class _CategoryViewState extends State<CategoryView> {
                     ListTile(
                       leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
                       title: Text(
-                        '카테고리 삭제',
+                        AppStrings.of(context).categoryDeleteTitle,
                         style: GoogleFonts.inter(color: const Color(0xFFEF4444), fontSize: 14.5, fontWeight: FontWeight.w600),
                       ),
                       contentPadding: EdgeInsets.zero,
@@ -8108,6 +9090,7 @@ class _CategoryViewState extends State<CategoryView> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final isKo = AppStrings.of(context).isKo;
             return Container(
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.of(context).size.height * 0.85,
@@ -8156,7 +9139,7 @@ class _CategoryViewState extends State<CategoryView> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '카테고리 순서 및 기본값 설정',
+                                isKo ? '카테고리 순서 및 기본값 설정' : 'Category Order & Defaults',
                                 style: GoogleFonts.inter(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w800,
@@ -8166,7 +9149,7 @@ class _CategoryViewState extends State<CategoryView> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '드래그하여 순서 변경 · 별표를 눌러 기본 카테고리 지정',
+                                isKo ? '드래그하여 순서 변경 · 별표를 눌러 기본 카테고리 지정' : 'Drag to reorder · Tap star to set default',
                                 style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   color: appTextTertiary,
@@ -8252,7 +9235,7 @@ class _CategoryViewState extends State<CategoryView> {
                                           if (isDefault) ...[
                                             const SizedBox(height: 2),
                                             Text(
-                                              '기본 카테고리 (작성 시 자동 선택)',
+                                              isKo ? '기본 카테고리 (작성 시 자동 선택)' : 'Default (Auto-selected)',
                                               style: GoogleFonts.inter(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w600,
@@ -8289,7 +9272,7 @@ class _CategoryViewState extends State<CategoryView> {
                                             ),
                                             const SizedBox(width: 4),
                                             Text(
-                                              isDefault ? '기본' : '기본설정',
+                                              isDefault ? (isKo ? '기본' : 'Default') : (isKo ? '기본설정' : 'Set Default'),
                                               style: GoogleFonts.inter(
                                                 fontSize: 11,
                                                 fontWeight: isDefault ? FontWeight.w700 : FontWeight.w500,
@@ -8335,7 +9318,7 @@ class _CategoryViewState extends State<CategoryView> {
                             ),
                           ),
                           child: Text(
-                            '완료',
+                            AppStrings.of(context).commonDone,
                             style: GoogleFonts.inter(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
@@ -8361,10 +9344,11 @@ class _CategoryViewState extends State<CategoryView> {
     Color themeAccent,
   ) {
     final isDark = theme.isDark;
+    final isKo = AppStrings.of(context).isKo;
     if (widget.categories.isEmpty) {
       return Center(
         child: Text(
-          '카테고리가 없습니다.',
+          isKo ? '카테고리가 없습니다.' : 'No categories.',
           style: GoogleFonts.inter(color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
         ),
       );
@@ -8377,7 +9361,7 @@ class _CategoryViewState extends State<CategoryView> {
 
     final heroEntries = currentEntries.where((e) => e.category == heroCat).toList();
     final heroCount = heroEntries.length;
-    final heroTodoCount = heroEntries.where((e) => e.status == 'todo').length;
+    final heroTodoCount = heroEntries.where((e) => e.isPendingTodo).length;
     final heroDoneCount = heroEntries.where((e) => e.status == 'done').length;
     final heroTotal = heroTodoCount + heroDoneCount;
     final heroDoneRate = heroTotal > 0 ? (heroDoneCount / heroTotal) : 0.0;
@@ -8477,7 +9461,7 @@ class _CategoryViewState extends State<CategoryView> {
                                     const Icon(Icons.star_rounded, size: 11, color: Colors.amber),
                                     const SizedBox(width: 3),
                                     Text(
-                                      isHeroDefault ? '기본' : '대표',
+                                      isHeroDefault ? (isKo ? '기본' : 'Default') : (isKo ? '대표' : 'Primary'),
                                       style: GoogleFonts.inter(
                                         fontSize: 10.5 * widget.uiScale,
                                         fontWeight: FontWeight.w700,
@@ -8491,7 +9475,7 @@ class _CategoryViewState extends State<CategoryView> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '총 $heroCount개 기록',
+                            isKo ? '총 $heroCount개 기록' : '$heroCount records',
                             style: GoogleFonts.inter(
                               color: isDark ? Colors.white60 : const Color(0xFF64748B),
                               fontSize: 12.5 * widget.uiScale,
@@ -8526,7 +9510,7 @@ class _CategoryViewState extends State<CategoryView> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'TODO 진행률 ($heroDoneCount/$heroTotal 완료)',
+                        isKo ? 'TODO 진행률 ($heroDoneCount/$heroTotal 완료)' : 'Tasks Progress ($heroDoneCount/$heroTotal Done)',
                         style: GoogleFonts.inter(
                           fontSize: 11 * widget.uiScale,
                           fontWeight: FontWeight.w600,
@@ -8582,7 +9566,7 @@ class _CategoryViewState extends State<CategoryView> {
               final cat = subCategories[index];
               final catEntries = currentEntries.where((e) => e.category == cat).toList();
               final count = catEntries.length;
-              final todoCount = catEntries.where((e) => e.status == 'todo').length;
+              final todoCount = catEntries.where((e) => e.isPendingTodo).length;
               final doneCount = catEntries.where((e) => e.status == 'done').length;
               final totalTasks = todoCount + doneCount;
               final color = widget.categoryColors[cat] ?? Colors.grey;
@@ -8662,7 +9646,7 @@ class _CategoryViewState extends State<CategoryView> {
                           Row(
                             children: [
                               Text(
-                                '$count개',
+                                isKo ? '$count개' : '$count items',
                                 style: GoogleFonts.inter(
                                   fontSize: 11 * widget.uiScale,
                                   color: isDark ? Colors.white54 : const Color(0xFF64748B),
@@ -8718,6 +9702,7 @@ class _CategoryViewState extends State<CategoryView> {
   Widget build(BuildContext context) {
     final theme = ThemeController.instance.currentTheme;
     final isAppDark = theme.isDark;
+    final isKo = AppStrings.of(context).isKo;
     final themeAccent = (!isAppDark && theme.accent.computeLuminance() > 0.6)
         ? const Color(0xFF4F46E5)
         : theme.accent;
@@ -8739,7 +9724,7 @@ class _CategoryViewState extends State<CategoryView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '카테고리',
+                        AppStrings.of(context).navCategory,
                         style: GoogleFonts.inter(
                           fontSize: 18 * widget.uiScale,
                           fontWeight: FontWeight.w800,
@@ -8749,7 +9734,7 @@ class _CategoryViewState extends State<CategoryView> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '주제별로 모아보는 나만의 순간들',
+                        isKo ? '주제별로 모아보는 나만의 순간들' : 'Your moments organized by topic',
                         style: GoogleFonts.inter(
                           color: isAppDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
                           fontSize: 12.5 * widget.uiScale,
@@ -8761,7 +9746,7 @@ class _CategoryViewState extends State<CategoryView> {
                     children: [
                       IconButton(
                         onPressed: () => _showReorderAndDefaultSheet(context),
-                        tooltip: '카테고리 순서 및 기본 설정',
+                        tooltip: isKo ? '카테고리 순서 및 기본 설정' : 'Category order & default',
                         icon: const Icon(Icons.tune_rounded, size: 20),
                         color: isAppDark ? Colors.white70 : const Color(0xFF475569),
                         style: IconButton.styleFrom(
@@ -8780,7 +9765,7 @@ class _CategoryViewState extends State<CategoryView> {
                             onAddCategory: widget.onAddCategory,
                           );
                         },
-                        tooltip: '새 카테고리 추가',
+                        tooltip: AppStrings.of(context).categoryAddNew,
                         icon: const Icon(Icons.add_rounded, size: 22),
                         color: themeAccent.computeLuminance() > 0.6 ? Colors.black : Colors.white,
                         style: IconButton.styleFrom(
@@ -8883,8 +9868,9 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
     // 날짜/시간 순서(오름차순) 정렬
     selectedEntries.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
+    final isKo = AppStrings.of(context).isKo;
     final sb = StringBuffer();
-    sb.writeln('[$_currentCategory] 기록 (총 ${selectedEntries.length}건)');
+    sb.writeln('[$_currentCategory] ${isKo ? "기록 (총 ${selectedEntries.length}건)" : "Records (${selectedEntries.length} items)"}');
     sb.writeln();
 
     final dateFormat = DateFormat('yyyy.MM.dd HH:mm');
@@ -8893,21 +9879,27 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
       final timeStr = dateFormat.format(e.timestamp);
       final isDone = e.status == 'done';
       final statusBadge = isDone
-          ? '✅ [완료]'
-          : (e.status == 'todo' ? '⏳ [TODO]' : '📌 [기록]');
+          ? (isKo ? '✅ [완료]' : '✅ [DONE]')
+          : (e.isInProgress
+              ? (isKo ? '🔥 [진행 중]' : '🔥 [IN PROGRESS]')
+              : (e.isPaused
+                  ? (isKo ? '⏸ [일시정지]' : '⏸ [PAUSED]')
+                  : (e.isTodo
+                      ? (isKo ? '⏳ [TODO]' : '⏳ [TODO]')
+                      : (isKo ? '📌 [기록]' : '📌 [RECORD]'))));
 
       sb.writeln('${i + 1}. $statusBadge $timeStr');
       if (e.note.trim().isNotEmpty) {
         sb.writeln('   ${e.note.trim()}');
       }
       if (isDone && e.doneNote != null && e.doneNote!.trim().isNotEmpty) {
-        sb.writeln('   • 완료 메모: ${e.doneNote!.trim()}');
+        sb.writeln('   • ${isKo ? "완료 메모" : "Completion Note"}: ${e.doneNote!.trim()}');
       }
-      if (e.effectiveDurationMinutes > 0) {
-        sb.writeln('   • 소요 시간: ${e.effectiveDurationMinutes}분');
+      if (e.effectiveDurationSeconds > 0) {
+        sb.writeln('   • ${isKo ? "소요 시간" : "Duration"}: ${formatSecondsKo(e.effectiveDurationSeconds)}');
       }
       if (e.targetDate != null) {
-        sb.writeln('   • 목표 기한: ${dateFormat.format(e.targetDate!)}');
+        sb.writeln('   • ${isKo ? "목표 기한" : "Due Date"}: ${dateFormat.format(e.targetDate!)}');
       }
       if (i < selectedEntries.length - 1) {
         sb.writeln();
@@ -8939,10 +9931,12 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('📋 글 내용이 클립보드에 복사되었습니다. (사진만 전송될 경우 붙여넣기 하세요)'),
+            SnackBar(
+              content: Text(isKo
+                  ? '📋 글 내용이 클립보드에 복사되었습니다. (사진만 전송될 경우 붙여넣기 하세요)'
+                  : '📋 Content copied to clipboard. (Paste if only photos were attached)'),
               behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 3),
+              duration: const Duration(seconds: 3),
             ),
           );
         }
@@ -8959,7 +9953,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('공유 중 오류가 발생했습니다: $err'),
+            content: Text(isKo ? '공유 중 오류가 발생했습니다: $err' : 'Error sharing: $err'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -8969,6 +9963,9 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final isKo = s.isKo;
+
     return ValueListenableBuilder<List<TimestampEntry>>(
       valueListenable: widget.entriesNotifier,
       builder: (context, currentEntries, _) {
@@ -8977,7 +9974,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
             .toList();
 
         final filteredEntries = _showOnlyTodo
-            ? categoryEntries.where((e) => e.status == 'todo').toList()
+            ? categoryEntries.where((e) => e.isPendingTodo).toList()
             : categoryEntries;
 
         final bottomPadding = MediaQuery.of(context).padding.bottom;
@@ -9005,7 +10002,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                           _selectedEntryIds.clear();
                         });
                       },
-                      tooltip: '선택 취소',
+                      tooltip: isKo ? '선택 취소' : 'Cancel selection',
                     )
                   : IconButton(
                       icon: Icon(Icons.arrow_back_ios_new, size: 20, color: appText),
@@ -9013,7 +10010,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                     ),
               title: Text(
                 _isSelectionMode
-                    ? '${_selectedEntryIds.length}개 선택됨'
+                    ? (isKo ? '${_selectedEntryIds.length}개 선택됨' : '${_selectedEntryIds.length} selected')
                     : _currentCategory,
                 style: GoogleFonts.inter(
                   fontWeight: FontWeight.w800,
@@ -9035,7 +10032,9 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                           });
                         },
                         child: Text(
-                          _selectedEntryIds.length == filteredEntries.length ? '전체 해제' : '전체 선택',
+                          _selectedEntryIds.length == filteredEntries.length
+                              ? (isKo ? '전체 해제' : 'Deselect All')
+                              : (isKo ? '전체 선택' : 'Select All'),
                           style: GoogleFonts.inter(
                             color: _effectiveColor,
                             fontWeight: FontWeight.w700,
@@ -9055,7 +10054,9 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                           color: _effectiveColor,
                           size: 22,
                         ),
-                        tooltip: _isAllExpanded ? '전체 접기' : '전체 펼치기',
+                        tooltip: _isAllExpanded
+                            ? (isKo ? '전체 접기' : 'Collapse All')
+                            : (isKo ? '전체 펼치기' : 'Expand All'),
                       ),
                       IconButton(
                         onPressed: () => setState(() => _showOnlyTodo = !_showOnlyTodo),
@@ -9068,7 +10069,9 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                               : appTextTertiary,
                           size: 20,
                         ),
-                        tooltip: _showOnlyTodo ? '전체 보기' : 'TODO 모아보기',
+                        tooltip: _showOnlyTodo
+                            ? (isKo ? '전체 보기' : 'View All')
+                            : (isKo ? 'TODO 모아보기' : 'View Tasks'),
                       ),
                       Padding(
                         padding: const EdgeInsets.only(right: 8.0),
@@ -9088,7 +10091,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                                 : _effectiveColor,
                             size: 21,
                           ),
-                          tooltip: '기록 선택하여 공유',
+                          tooltip: isKo ? '기록 선택하여 공유' : 'Select to share',
                         ),
                       ),
                     ],
@@ -9115,7 +10118,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${_selectedEntryIds.length}개 선택됨',
+                                isKo ? '${_selectedEntryIds.length}개 선택됨' : '${_selectedEntryIds.length} selected',
                                 style: GoogleFonts.inter(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15,
@@ -9124,8 +10127,8 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                               ),
                               Text(
                                 _selectedEntryIds.isEmpty
-                                    ? '공유할 기록을 체크하세요'
-                                    : '텍스트 및 첨부 사진 포함',
+                                    ? (isKo ? '공유할 기록을 체크하세요' : 'Select records to share')
+                                    : (isKo ? '텍스트 및 첨부 사진 포함' : 'Includes text & photos'),
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: appTextTertiary,
@@ -9140,7 +10143,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                               : () => _shareSelectedEntries(filteredEntries),
                           icon: const Icon(Icons.share_rounded, size: 18),
                           label: Text(
-                            '공유하기',
+                            isKo ? '공유하기' : 'Share',
                             style: GoogleFonts.inter(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
@@ -9190,7 +10193,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              '이 카테고리에 기록이 없습니다',
+                              isKo ? '이 카테고리에 기록이 없습니다' : 'No records in this category',
                               style: GoogleFonts.inter(
                                 color: appTextTertiary,
                                 fontSize: 15,
@@ -9214,7 +10217,7 @@ class _CategoryDetailViewState extends State<CategoryDetailView> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              '이 카테고리에 진행 중인 TODO가 없습니다',
+                              isKo ? '이 카테고리에 진행 중인 TODO가 없습니다' : 'No pending tasks in this category',
                               style: GoogleFonts.inter(
                                 color: appTextTertiary,
                                 fontSize: 15,
@@ -9555,6 +10558,72 @@ class _InsightViewState extends State<InsightView> {
     await prefs.setString('chronos_insight_card_visibility', jsonEncode(_cardVisibility));
   }
 
+  String _getCardTitle(String id, BuildContext context) {
+    final s = AppStrings.of(context);
+    switch (id) {
+      case 'activity_calendar':
+        return s.insightCalendar;
+      case 'where_my_time_goes':
+        return s.insightTimeStats;
+      case 'top_tasks':
+        return s.insightRanking;
+      case 'activity_distribution_24h':
+        return s.insight24hPattern;
+      case 'weekday_pattern':
+        return s.insightWeeklyPattern;
+      case 'productivity_summary':
+        return s.insightTodoCompletion;
+      case 'weekly_timetable':
+        return s.insightWeeklyTable;
+      case 'monthly_time_matrix':
+        return s.insightMonthlyTable;
+      default:
+        return id;
+    }
+  }
+
+  String _getCardSubtitle(String id, BuildContext context) {
+    final s = AppStrings.of(context);
+    switch (id) {
+      case 'activity_calendar':
+        return s.insightCalendarDesc;
+      case 'where_my_time_goes':
+        return s.insightTimeStatsDesc;
+      case 'top_tasks':
+        return s.insightRankingDesc;
+      case 'activity_distribution_24h':
+        return s.insight24hPatternDesc;
+      case 'weekday_pattern':
+        return s.insightWeeklyPatternDesc;
+      case 'productivity_summary':
+        return s.insightTodoCompletionDesc;
+      case 'weekly_timetable':
+        return s.insightWeeklyTableDesc;
+      case 'monthly_time_matrix':
+        return s.insightMonthlyTableDesc;
+      default:
+        return '';
+    }
+  }
+
+  String _getFilterLabel(String filter, BuildContext context) {
+    final s = AppStrings.of(context);
+    switch (filter) {
+      case '전체':
+        return s.filterAll;
+      case '일간':
+        return s.filterDaily;
+      case '주간':
+        return s.filterWeekly;
+      case '월간':
+        return s.filterMonthly;
+      case '연간':
+        return s.filterYearly;
+      default:
+        return filter;
+    }
+  }
+
   void _showCardCustomizationSheet(BuildContext context) {
     final List<String> currentOrder = List<String>.from(_cardOrder);
     final Map<String, bool> currentVis = Map<String, bool>.from(_cardVisibility);
@@ -9572,6 +10641,7 @@ class _InsightViewState extends State<InsightView> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final isKo = AppStrings.of(context).isKo;
             return Container(
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.of(context).size.height * 0.85,
@@ -9620,7 +10690,7 @@ class _InsightViewState extends State<InsightView> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '통계 카드 편집',
+                                isKo ? '통계 카드 편집' : 'Edit Insight Cards',
                                 style: GoogleFonts.inter(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w800,
@@ -9630,7 +10700,7 @@ class _InsightViewState extends State<InsightView> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '카드를 켜거나 끄고, 드래그하여 순서를 변경하세요',
+                                isKo ? '카드를 켜거나 끄고, 드래그하여 순서를 변경하세요' : 'Toggle cards and drag to reorder',
                                 style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   color: appTextTertiary,
@@ -9655,7 +10725,7 @@ class _InsightViewState extends State<InsightView> {
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                                 child: Text(
-                                  '초기화',
+                                  AppStrings.of(context).resetPreset,
                                   style: GoogleFonts.inter(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w600,
@@ -9729,7 +10799,7 @@ class _InsightViewState extends State<InsightView> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            cardMeta['title'] as String,
+                                            _getCardTitle(cardId, context),
                                             style: GoogleFonts.inter(
                                               fontSize: 13.5,
                                               fontWeight: FontWeight.w700,
@@ -9738,7 +10808,7 @@ class _InsightViewState extends State<InsightView> {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            cardMeta['subtitle'] as String,
+                                            _getCardSubtitle(cardId, context),
                                             style: GoogleFonts.inter(
                                               fontSize: 10.5,
                                               color: appTextTertiary,
@@ -9796,7 +10866,7 @@ class _InsightViewState extends State<InsightView> {
                             ),
                           ),
                           child: Text(
-                            '설정 완료',
+                            AppStrings.of(context).commonDone,
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -9893,6 +10963,7 @@ class _InsightViewState extends State<InsightView> {
         DateTime tempDate = _calendarMonth;
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final isKo = AppStrings.of(context).isKo;
             return AlertDialog(
               backgroundColor: appCardBg,
               shape: RoundedRectangleBorder(
@@ -9903,7 +10974,7 @@ class _InsightViewState extends State<InsightView> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '월 선택',
+                    isKo ? '월 선택' : 'Select Month',
                     style: GoogleFonts.inter(
                       color: appText,
                       fontSize: 18,
@@ -9980,7 +11051,7 @@ class _InsightViewState extends State<InsightView> {
                         ),
                         alignment: Alignment.center,
                         child: Text(
-                          '$month월',
+                          isKo ? '$month월' : DateFormat('MMM').format(DateTime(2024, month)),
                           style: GoogleFonts.inter(
                             color: isSelected
                                 ? Colors.white
@@ -10004,15 +11075,25 @@ class _InsightViewState extends State<InsightView> {
   }
 
   String _formatDateKorean(DateTime date, {bool includeWeekday = false}) {
+    final isKo = AppStrings.isCurrentLocaleKo;
     if (includeWeekday) {
-      const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
-      final w = weekdays[(date.weekday - 1).clamp(0, 6)];
-      return '${date.year}년 ${date.month}월 ${date.day}일 ($w)';
+      if (isKo) {
+        const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+        final w = weekdays[(date.weekday - 1).clamp(0, 6)];
+        return '${date.year}년 ${date.month}월 ${date.day}일 ($w)';
+      } else {
+        return DateFormat('EEE, MMM d, yyyy').format(date);
+      }
     }
-    return '${date.year}년 ${date.month}월';
+    if (isKo) {
+      return '${date.year}년 ${date.month}월';
+    } else {
+      return DateFormat('MMMM yyyy').format(date);
+    }
   }
 
   String _getWherePeriodLabel() {
+    final isKo = AppStrings.isCurrentLocaleKo;
     if (_whereFilter == '일간') {
       return _formatDateKorean(_whereReferenceDate, includeWeekday: true);
     } else if (_whereFilter == '주간') {
@@ -10023,9 +11104,9 @@ class _InsightViewState extends State<InsightView> {
     } else if (_whereFilter == '월간') {
       return _formatDateKorean(_whereReferenceDate);
     } else if (_whereFilter == '연간') {
-      return '${_whereReferenceDate.year}년';
+      return isKo ? '${_whereReferenceDate.year}년' : '${_whereReferenceDate.year}';
     }
-    return '전체 기간';
+    return isKo ? '전체 기간' : 'All Time';
   }
 
   List<TimestampEntry> _getWhereFilteredEntries(List<TimestampEntry> allEntries) {
@@ -10128,7 +11209,7 @@ class _InsightViewState extends State<InsightView> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      cat == 'All' ? '전체' : cat,
+                      cat == 'All' ? (AppStrings.of(context).isKo ? '전체' : 'All') : cat,
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -10146,12 +11227,13 @@ class _InsightViewState extends State<InsightView> {
   }
 
   String _formatMinutes(int minutes) {
-    if (minutes <= 0) return '0분';
+    final isKo = AppStrings.isCurrentLocaleKo;
+    if (minutes <= 0) return isKo ? '0분' : '0m';
     final h = minutes ~/ 60;
     final m = minutes % 60;
-    if (h > 0 && m > 0) return '${h}시간 ${m}분';
-    if (h > 0) return '${h}시간';
-    return '${m}분';
+    if (h > 0 && m > 0) return isKo ? '${h}시간 ${m}분' : '${h}h ${m}m';
+    if (h > 0) return isKo ? '${h}시간' : '${h}h';
+    return isKo ? '${m}분' : '${m}m';
   }
 
   Widget _buildSectionCard({
@@ -10230,6 +11312,7 @@ class _InsightViewState extends State<InsightView> {
     int totalCount,
     Map<String, Map<String, dynamic>> categoryStats,
   ) {
+    final isKo = AppStrings.of(context).isKo;
     int totalTimeMinutes = 0;
     if (categoryStats.isNotEmpty) {
       totalTimeMinutes = categoryStats.values.first['totalDurationMinutes'] as int? ?? 0;
@@ -10244,8 +11327,8 @@ class _InsightViewState extends State<InsightView> {
     final effectiveMetricType = _whereMetricType;
 
     return _buildSectionCard(
-      title: '시간 사용 통계',
-      subtitle: '카테고리별 소요 시간과 점유율을 분석합니다',
+      title: AppStrings.of(context).insightTimeStats,
+      subtitle: AppStrings.of(context).insightTimeStatsDesc,
       icon: Icons.pie_chart_outline_rounded,
       selector: Column(
         children: [
@@ -10257,7 +11340,7 @@ class _InsightViewState extends State<InsightView> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: ChoiceChip(
-                    label: Text(filter),
+                    label: Text(_getFilterLabel(filter, context)),
                     selected: isSelected,
                     selectedColor: accentColor,
                     backgroundColor: appSubtleBg,
@@ -10305,7 +11388,7 @@ class _InsightViewState extends State<InsightView> {
                         initialDate: _whereReferenceDate,
                         firstDate: DateTime(2000),
                         lastDate: DateTime(2100),
-                        title: '기준 날짜 선택',
+                        title: isKo ? '기준 날짜 선택' : 'Select Reference Date',
                         canClear: false,
                       );
                       if (picked != null) setState(() => _whereReferenceDate = picked);
@@ -10343,9 +11426,13 @@ class _InsightViewState extends State<InsightView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            totalTimeMinutes > 0
-                ? '총 ${_formatMinutes(totalTimeMinutes)} 소요 • $totalCount건의 기록'
-                : '총 $totalCount건의 기록',
+            isKo
+                ? (totalTimeMinutes > 0
+                    ? '총 ${_formatMinutes(totalTimeMinutes)} 소요 • $totalCount건의 기록'
+                    : '총 $totalCount건의 기록')
+                : (totalTimeMinutes > 0
+                    ? 'Total ${_formatMinutes(totalTimeMinutes)} • $totalCount records'
+                    : 'Total $totalCount records'),
             style: GoogleFonts.inter(
               color: appTextSecondary,
               fontSize: 13,
@@ -10394,7 +11481,7 @@ class _InsightViewState extends State<InsightView> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              '기록 건수 점유율',
+                              isKo ? '기록 건수 점유율' : 'Count Share',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: effectiveMetricType == 'count'
@@ -10442,7 +11529,7 @@ class _InsightViewState extends State<InsightView> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              '소요 시간 점유율',
+                              isKo ? '소요 시간 점유율' : 'Duration Share',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: effectiveMetricType == 'time'
@@ -10483,7 +11570,7 @@ class _InsightViewState extends State<InsightView> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '기록된 소요 시간이 없습니다',
+                      AppStrings.of(context).noTimeRecorded,
                       style: GoogleFonts.inter(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
@@ -10492,7 +11579,7 @@ class _InsightViewState extends State<InsightView> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'TODO를 완료하거나 소요 시간을 입력하면\n카테고리별 시간 점유율이 자동으로 분석됩니다.',
+                      AppStrings.of(context).noTimeRecordedDesc,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         fontSize: 11.5,
@@ -10509,7 +11596,9 @@ class _InsightViewState extends State<InsightView> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    effectiveMetricType == 'time' ? '카테고리별 시간 점유율' : '카테고리별 건수 점유율',
+                    effectiveMetricType == 'time'
+                        ? (AppStrings.of(context).isKo ? '카테고리별 시간 점유율' : 'Duration Share by Category')
+                        : (AppStrings.of(context).isKo ? '카테고리별 건수 점유율' : 'Count Share by Category'),
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
@@ -10519,8 +11608,8 @@ class _InsightViewState extends State<InsightView> {
                 ),
                 Text(
                   effectiveMetricType == 'time'
-                      ? '총 ${_formatMinutes(totalTimeMinutes)} 기준'
-                      : '총 $totalCount건 기준',
+                      ? (AppStrings.of(context).isKo ? '총 ${_formatMinutes(totalTimeMinutes)} 기준' : 'Total ${_formatMinutes(totalTimeMinutes)}')
+                      : (AppStrings.of(context).isKo ? '총 $totalCount건 기준' : 'Total $totalCount items'),
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -10577,7 +11666,7 @@ class _InsightViewState extends State<InsightView> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text(
-                  '선택한 기간에 기록된 데이터가 없습니다.',
+                  isKo ? '선택한 기간에 기록된 데이터가 없습니다.' : 'No data recorded for the selected period.',
                   style: GoogleFonts.inter(color: appTextTertiary, fontSize: 13),
                 ),
               ),
@@ -10591,14 +11680,14 @@ class _InsightViewState extends State<InsightView> {
   Widget _build24HourDistributionCard(List<TimestampEntry> entries) {
     if (entries.isEmpty) {
       return _buildSectionCard(
-        title: '24시간 활동 패턴',
-        subtitle: '언제 가장 활발하게 활동하고 기록하는지 분석합니다',
+        title: AppStrings.of(context).insight24hPattern,
+        subtitle: AppStrings.of(context).insight24hPatternDesc,
         icon: Icons.schedule_rounded,
         content: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Text(
-              '기록된 데이터가 없습니다.',
+              AppStrings.of(context).isKo ? '기록된 데이터가 없습니다.' : 'No data recorded yet.',
               style: GoogleFonts.inter(color: appTextTertiary, fontSize: 13),
             ),
           ),
@@ -10630,6 +11719,7 @@ class _InsightViewState extends State<InsightView> {
     for (int i = 12; i < 18; i++) afternoonCount += hourCounts[i];
     for (int i = 18; i < 24; i++) eveningCount += hourCounts[i];
 
+    final isKo = AppStrings.of(context).isKo;
     final total = entries.length;
     final theme = ThemeController.instance.currentTheme;
     final themeAccent = (!theme.isDark && theme.accent.computeLuminance() > 0.6)
@@ -10640,8 +11730,8 @@ class _InsightViewState extends State<InsightView> {
         : _getCategoryColor(_selectedGlobalCategory);
 
     return _buildSectionCard(
-      title: '24시간 활동 패턴',
-      subtitle: '언제 가장 활발하게 활동하고 기록하는지 분석합니다',
+      title: AppStrings.of(context).insight24hPattern,
+      subtitle: AppStrings.of(context).insight24hPatternDesc,
       icon: Icons.schedule_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -10660,8 +11750,10 @@ class _InsightViewState extends State<InsightView> {
                 Expanded(
                   child: Text(
                     maxHourCount > 0
-                        ? '피크 타임: ${peakHour.toString().padLeft(2, '0')}:00 ~ ${(peakHour + 1).toString().padLeft(2, '0')}:00 ($maxHourCount건 기록)'
-                        : '기록된 활동 없음',
+                        ? (isKo
+                            ? '피크 타임: ${peakHour.toString().padLeft(2, '0')}:00 ~ ${(peakHour + 1).toString().padLeft(2, '0')}:00 ($maxHourCount건 기록)'
+                            : 'Peak Time: ${peakHour.toString().padLeft(2, '0')}:00 ~ ${(peakHour + 1).toString().padLeft(2, '0')}:00 ($maxHourCount records)')
+                        : (isKo ? '기록된 활동 없음' : 'No activity recorded'),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -10675,18 +11767,18 @@ class _InsightViewState extends State<InsightView> {
           const SizedBox(height: 16),
           Row(
             children: [
-              _buildSegmentPill('🌙 새벽', '00-06시', nightCount, total, const Color(0xFF8B5CF6)),
+              _buildSegmentPill(isKo ? '🌙 새벽' : '🌙 Night', isKo ? '00-06시' : '00-06h', nightCount, total, const Color(0xFF8B5CF6)),
               const SizedBox(width: 8),
-              _buildSegmentPill('🌅 오전', '06-12시', morningCount, total, const Color(0xFF06B6D4)),
+              _buildSegmentPill(isKo ? '🌅 오전' : '🌅 Morning', isKo ? '06-12시' : '06-12h', morningCount, total, const Color(0xFF06B6D4)),
               const SizedBox(width: 8),
-              _buildSegmentPill('☀️ 오후', '12-18시', afternoonCount, total, const Color(0xFFF59E0B)),
+              _buildSegmentPill(isKo ? '☀️ 오후' : '☀️ Afternoon', isKo ? '12-18시' : '12-18h', afternoonCount, total, const Color(0xFFF59E0B)),
               const SizedBox(width: 8),
-              _buildSegmentPill('🌆 저녁', '18-24시', eveningCount, total, const Color(0xFF10B981)),
+              _buildSegmentPill(isKo ? '🌆 저녁' : '🌆 Evening', isKo ? '18-24시' : '18-24h', eveningCount, total, const Color(0xFF10B981)),
             ],
           ),
           const SizedBox(height: 20),
           Text(
-            '24시간 타임라인 (00:00 ~ 23:00)',
+            isKo ? '24시간 타임라인 (00:00 ~ 23:00)' : '24-Hour Timeline (00:00 ~ 23:00)',
             style: GoogleFonts.inter(
               fontSize: 10,
               fontWeight: FontWeight.w800,
@@ -10810,7 +11902,7 @@ class _InsightViewState extends State<InsightView> {
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                '$count건',
+                AppStrings.isCurrentLocaleKo ? '$count건' : '$count',
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -10837,14 +11929,14 @@ class _InsightViewState extends State<InsightView> {
   Widget _buildWeekdayPatternCard(List<TimestampEntry> entries) {
     if (entries.isEmpty) {
       return _buildSectionCard(
-        title: '요일별 활동 패턴',
-        subtitle: '요일별 활동 패턴 및 집중도',
+        title: AppStrings.of(context).insightWeeklyPattern,
+        subtitle: AppStrings.of(context).insightWeeklyPatternDesc,
         icon: Icons.calendar_view_week_rounded,
         content: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Text(
-              '기록된 데이터가 없습니다.',
+              AppStrings.of(context).isKo ? '기록된 데이터가 없습니다.' : 'No data recorded yet.',
               style: GoogleFonts.inter(color: appTextTertiary, fontSize: 13),
             ),
           ),
@@ -10854,15 +11946,13 @@ class _InsightViewState extends State<InsightView> {
 
     final dayCounts = List.filled(7, 0);
     final dayMinutes = List.filled(7, 0);
-    final dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+    final isKo = AppStrings.of(context).isKo;
+    final dayNames = isKo ? ['월', '화', '수', '목', '금', '토', '일'] : ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
     for (final e in entries) {
       final dIndex = (e.timestamp.weekday - 1).clamp(0, 6);
       dayCounts[dIndex]++;
-      int dur = e.computedDurationMinutes ?? 0;
-      if (dur <= 0 && e.status == 'done' && e.doneTimestamp != null) {
-        dur = e.doneTimestamp!.difference(e.timestamp).inMinutes;
-      }
+      int dur = e.effectiveDurationMinutes;
       dayMinutes[dIndex] += dur;
     }
 
@@ -10891,8 +11981,8 @@ class _InsightViewState extends State<InsightView> {
         : _getCategoryColor(_selectedGlobalCategory);
 
     return _buildSectionCard(
-      title: '요일별 활동 패턴',
-      subtitle: '요일별 활동 빈도와 주중/주말 생산성을 비교합니다',
+      title: AppStrings.of(context).insightWeeklyPattern,
+      subtitle: AppStrings.of(context).insightWeeklyPatternDesc,
       icon: Icons.calendar_view_week_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -10911,8 +12001,10 @@ class _InsightViewState extends State<InsightView> {
                 Expanded(
                   child: Text(
                     maxDayCount > 0
-                        ? '가장 집중한 요일: ${dayNames[bestDay]}요일 (${dayCounts[bestDay]}건 / ${_formatMinutes(dayMinutes[bestDay])})'
-                        : '기록된 활동 없음',
+                        ? (isKo
+                            ? '가장 집중한 요일: ${dayNames[bestDay]}요일 (${dayCounts[bestDay]}건 / ${_formatMinutes(dayMinutes[bestDay])})'
+                            : 'Most Focused: ${dayNames[bestDay]} (${dayCounts[bestDay]} records / ${_formatMinutes(dayMinutes[bestDay])})')
+                        : (isKo ? '기록된 활동 없음' : 'No activity recorded'),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -10992,7 +12084,9 @@ class _InsightViewState extends State<InsightView> {
                   children: [
                     Expanded(
                       child: Text(
-                        '주중 (월~금) $weekdayCount건 ($weekdayPct%)',
+                        isKo
+                            ? '주중 (월~금) $weekdayCount건 ($weekdayPct%)'
+                            : 'Weekdays (M-F) $weekdayCount ($weekdayPct%)',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -11005,7 +12099,9 @@ class _InsightViewState extends State<InsightView> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '주말 (토~일) $weekendCount건 ($weekendPct%)',
+                        isKo
+                            ? '주말 (토~일) $weekendCount건 ($weekendPct%)'
+                            : 'Weekends (S-S) $weekendCount ($weekendPct%)',
                         textAlign: TextAlign.end,
                         style: GoogleFonts.inter(
                           fontSize: 11,
@@ -11050,17 +12146,14 @@ class _InsightViewState extends State<InsightView> {
     final chartColor = _selectedGlobalCategory == 'All'
         ? const Color(0xFF10B981)
         : _getCategoryColor(_selectedGlobalCategory);
-    final todos = entries.where((e) => e.status == 'todo' || e.status == 'done').toList();
+    final todos = entries.where((e) => e.isAnyTodo).toList();
     final dones = entries.where((e) => e.status == 'done').toList();
-    final pending = entries.where((e) => e.status == 'todo').toList();
+    final pending = entries.where((e) => e.isPendingTodo).toList();
 
     int totalDoneMinutes = 0;
     int doneCountWithTime = 0;
     for (final d in dones) {
-      int dur = d.computedDurationMinutes ?? 0;
-      if (dur <= 0 && d.doneTimestamp != null) {
-        dur = d.doneTimestamp!.difference(d.timestamp).inMinutes;
-      }
+      int dur = d.effectiveDurationMinutes;
       if (dur > 0) {
         totalDoneMinutes += dur;
         doneCountWithTime++;
@@ -11069,20 +12162,22 @@ class _InsightViewState extends State<InsightView> {
     final avgDoneMinutes = doneCountWithTime > 0 ? (totalDoneMinutes ~/ doneCountWithTime) : 0;
     final int completionRate = todos.isNotEmpty ? ((dones.length / todos.length) * 100).toInt() : 0;
 
+    final s = AppStrings.of(context);
+    final isKo = s.isKo;
     String insightMsg;
     if (todos.isEmpty) {
-      insightMsg = '아직 등록된 TODO가 없습니다. TODO를 기록해보세요!';
+      insightMsg = isKo ? '아직 등록된 TODO가 없습니다. TODO를 기록해보세요!' : 'No tasks registered yet. Add a task to get started!';
     } else if (completionRate >= 80) {
-      insightMsg = '대단해요! 대부분의 목표를 완벽하게 완수하고 있습니다 🎉';
+      insightMsg = isKo ? '대단해요! 대부분의 목표를 완벽하게 완수하고 있습니다 🎉' : 'Awesome! You are completing most of your goals 🎉';
     } else if (completionRate >= 50) {
-      insightMsg = '절반 이상의 목표를 달성하며 꾸준히 나아가고 있습니다 👍';
+      insightMsg = isKo ? '절반 이상의 목표를 달성하며 꾸준히 나아가고 있습니다 👍' : 'Great progress! More than half completed 👍';
     } else {
-      insightMsg = '차근차근 하나씩 완료해 나가며 달성률을 높여보세요 💪';
+      insightMsg = isKo ? '차근차근 하나씩 완료해 나가며 달성률을 높여보세요 💪' : 'Keep going step by step to improve your completion rate 💪';
     }
 
     return _buildSectionCard(
-      title: 'TODO 달성률',
-      subtitle: '목표 달성률 및 작업 완료 속도를 분석합니다',
+      title: s.insightTodoCompletion,
+      subtitle: s.insightTodoCompletionDesc,
       icon: Icons.task_alt_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -11101,7 +12196,7 @@ class _InsightViewState extends State<InsightView> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'TODO 달성률',
+                      s.insightTodoCompletion,
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -11142,17 +12237,17 @@ class _InsightViewState extends State<InsightView> {
           const SizedBox(height: 14),
           Row(
             children: [
-              _buildMetricTile('완료된 작업', '${dones.length}건', Icons.check_circle_outline_rounded, const Color(0xFF10B981)),
+              _buildMetricTile(s.metricCompletedTasks, isKo ? '${dones.length}건' : '${dones.length}', Icons.check_circle_outline_rounded, const Color(0xFF10B981)),
               const SizedBox(width: 8),
-              _buildMetricTile('진행 중 TODO', '${pending.length}건', Icons.pending_actions_rounded, const Color(0xFFF59E0B)),
+              _buildMetricTile(s.metricPendingTasks, isKo ? '${pending.length}건' : '${pending.length}', Icons.pending_actions_rounded, const Color(0xFFF59E0B)),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              _buildMetricTile('총 TODO 수', '${todos.length}건', Icons.format_list_bulleted_rounded, themeAccent),
+              _buildMetricTile(s.metricTotalTasks, isKo ? '${todos.length}건' : '${todos.length}', Icons.format_list_bulleted_rounded, themeAccent),
               const SizedBox(width: 8),
-              _buildMetricTile('평균 소요 시간', avgDoneMinutes > 0 ? _formatMinutes(avgDoneMinutes) : '-', Icons.timer_outlined, const Color(0xFF06B6D4)),
+              _buildMetricTile(s.metricAvgDuration, avgDoneMinutes > 0 ? _formatMinutes(avgDoneMinutes) : '-', Icons.timer_outlined, const Color(0xFF06B6D4)),
             ],
           ),
         ],
@@ -11220,10 +12315,7 @@ class _InsightViewState extends State<InsightView> {
     final List<Map<String, dynamic>> tasksWithTime = [];
 
     for (final e in entries) {
-      int dur = e.computedDurationMinutes ?? 0;
-      if (dur <= 0 && e.status == 'done' && e.doneTimestamp != null) {
-        dur = e.doneTimestamp!.difference(e.timestamp).inMinutes;
-      }
+      int dur = e.effectiveDurationMinutes;
       if (dur > 0) {
         tasksWithTime.add({
           'entry': e,
@@ -11240,15 +12332,15 @@ class _InsightViewState extends State<InsightView> {
         : theme.accent;
 
     return _buildSectionCard(
-      title: '활동 시간 랭킹',
-      subtitle: '가장 많은 시간을 투자한 활동 Top 5',
+      title: AppStrings.of(context).insightRanking,
+      subtitle: AppStrings.of(context).insightRankingDesc,
       icon: Icons.leaderboard_outlined,
       content: topTasks.isEmpty
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Text(
-                  '소요 시간이 기록된 활동이 없습니다.',
+                  AppStrings.of(context).noTasksForStats,
                   style: GoogleFonts.inter(color: appTextTertiary, fontSize: 13),
                 ),
               ),
@@ -11305,7 +12397,9 @@ class _InsightViewState extends State<InsightView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              entry.note.isEmpty ? '기록된 작업' : entry.note,
+                              entry.note.isEmpty
+                                  ? (AppStrings.of(context).isKo ? '기록된 작업' : 'Recorded task')
+                                  : entry.note,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
@@ -11380,6 +12474,7 @@ class _InsightViewState extends State<InsightView> {
     String? title,
     String? subtitle,
   }) {
+    final isKo = AppStrings.of(context).isKo;
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
     final w = weekdays[(date.weekday - 1).clamp(0, 6)];
     final theme = ThemeController.instance.currentTheme;
@@ -11460,7 +12555,7 @@ class _InsightViewState extends State<InsightView> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  title ?? '${date.year}년 ${date.month}월 ${date.day}일 ($w)',
+                                  title ?? (isKo ? '${date.year}년 ${date.month}월 ${date.day}일 ($w)' : DateFormat('EEE, MMM d, yyyy').format(date)),
                                   style: GoogleFonts.inter(
                                     fontSize: 17,
                                     fontWeight: FontWeight.w800,
@@ -11472,8 +12567,8 @@ class _InsightViewState extends State<InsightView> {
                                 Text(
                                   subtitle ??
                                       (matchedEntries.isEmpty
-                                          ? '기록된 활동이 없습니다'
-                                          : '총 ${matchedEntries.length}건의 기록'),
+                                          ? (isKo ? '기록된 활동이 없습니다' : 'No activity recorded')
+                                          : (isKo ? '총 ${matchedEntries.length}건의 기록' : '${matchedEntries.length} records in total')),
                                   style: GoogleFonts.inter(
                                     fontSize: 12,
                                     color: appTextTertiary,
@@ -11521,7 +12616,7 @@ class _InsightViewState extends State<InsightView> {
                                     ),
                                     const SizedBox(height: 10),
                                     Text(
-                                      '기록된 활동이 없습니다',
+                                      isKo ? '기록된 활동이 없습니다' : 'No activity recorded',
                                       style: GoogleFonts.inter(
                                         fontSize: 13.5,
                                         color: appTextTertiary,
@@ -11570,6 +12665,7 @@ class _InsightViewState extends State<InsightView> {
     int hour,
     List<TimestampEntry> entries,
   ) {
+    final isKo = AppStrings.of(context).isKo;
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
     final w = weekdays[(date.weekday - 1).clamp(0, 6)];
     final currHour = hour.toString().padLeft(2, '0');
@@ -11584,7 +12680,9 @@ class _InsightViewState extends State<InsightView> {
             e.timestamp.day == date.day &&
             e.timestamp.hour == hour;
       },
-      title: '${date.month}월 ${date.day}일 ($w) $currHour:00 ~ $nextHour:00',
+      title: isKo
+          ? '${date.month}월 ${date.day}일 ($w) $currHour:00 ~ $nextHour:00'
+          : '${DateFormat("MMM d, EEE").format(date)} $currHour:00 ~ $nextHour:00',
     );
   }
 
@@ -11593,6 +12691,7 @@ class _InsightViewState extends State<InsightView> {
     DateTime date,
     List<TimestampEntry> entries,
   ) {
+    final isKo = AppStrings.of(context).isKo;
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
     final w = weekdays[(date.weekday - 1).clamp(0, 6)];
     _showDayEntriesBottomSheet(
@@ -11604,7 +12703,9 @@ class _InsightViewState extends State<InsightView> {
             e.timestamp.month == date.month &&
             e.timestamp.day == date.day;
       },
-      title: '${date.year}년 ${date.month}월 ${date.day}일 ($w)',
+      title: isKo
+          ? '${date.year}년 ${date.month}월 ${date.day}일 ($w)'
+          : DateFormat('EEE, MMM d, yyyy').format(date),
     );
   }
 
@@ -11636,11 +12737,14 @@ class _InsightViewState extends State<InsightView> {
         ? const Color(0xFF4F46E5)
         : theme.accent;
 
-    const weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+    final isKo = AppStrings.of(context).isKo;
+    final weekdayLabels = isKo ? ['월', '화', '수', '목', '금', '토', '일'] : ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
     return _buildSectionCard(
-      title: '월간 타임 테이블',
-      subtitle: '세로(날짜 1~${daysInMonth}일) × 가로(24시간) 활동 타임라인',
+      title: AppStrings.of(context).insightMonthlyTable,
+      subtitle: isKo
+          ? '세로(날짜 1~${daysInMonth}일) × 가로(24시간) 활동 타임라인'
+          : 'Days (1~$daysInMonth) × 24h activity timeline',
       icon: Icons.calendar_view_month_rounded,
       selector: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -11670,7 +12774,9 @@ class _InsightViewState extends State<InsightView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${selectedMonth.year}년 ${selectedMonth.month}월',
+                      isKo
+                          ? '${selectedMonth.year}년 ${selectedMonth.month}월'
+                          : DateFormat('MMMM yyyy').format(selectedMonth),
                       style: GoogleFonts.inter(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
@@ -11686,7 +12792,7 @@ class _InsightViewState extends State<InsightView> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '이번 달로',
+                          isKo ? '이번 달로' : 'This Month',
                           style: GoogleFonts.inter(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
@@ -11698,7 +12804,9 @@ class _InsightViewState extends State<InsightView> {
                   ],
                 ),
                 Text(
-                  '총 ${monthEntries.length}건 기록 • ${daysInMonth}일 중 ${dayEntriesMap.keys.length}일 활동',
+                  isKo
+                      ? '총 ${monthEntries.length}건 기록 • ${daysInMonth}일 중 ${dayEntriesMap.keys.length}일 활동'
+                      : '${monthEntries.length} records • Active ${dayEntriesMap.keys.length}/$daysInMonth days',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     color: appTextTertiary,
@@ -11730,11 +12838,11 @@ class _InsightViewState extends State<InsightView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('00시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
-                Text('06시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
-                Text('12시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
-                Text('18시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
-                Text('24시', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text(isKo ? '00시' : '00h', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text(isKo ? '06시' : '06h', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text(isKo ? '12시' : '12h', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text(isKo ? '18시' : '18h', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
+                Text(isKo ? '24시' : '24h', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: appTextTertiary)),
               ],
             ),
           ),
@@ -11920,7 +13028,7 @@ class _InsightViewState extends State<InsightView> {
               Icon(Icons.touch_app_rounded, size: 13, color: appTextTertiary),
               const SizedBox(width: 4),
               Text(
-                '날짜를 탭하면 해당 일의 모든 기록 목록을 열람할 수 있습니다',
+                isKo ? '날짜를 탭하면 해당 일의 모든 기록 목록을 열람할 수 있습니다' : 'Tap a date to view all records for that day',
                 style: GoogleFonts.inter(fontSize: 11, color: appTextTertiary),
               ),
             ],
@@ -12012,14 +13120,15 @@ class _InsightViewState extends State<InsightView> {
         ? const Color(0xFF4F46E5)
         : theme.accent;
 
-    const weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+    final isKo = AppStrings.of(context).isKo;
+    final weekdayLabels = isKo ? ['월', '화', '수', '목', '금', '토', '일'] : ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
     final weekEndDisplay = weekStart.add(const Duration(days: 6));
     final periodTitle = '${weekStart.month}.${weekStart.day} ~ ${weekEndDisplay.month}.${weekEndDisplay.day}';
 
     return _buildSectionCard(
-      title: '주간 타임 테이블',
-      subtitle: 'Outlook 스타일 가로(요일) × 세로(시간대) 활동 매트릭스',
+      title: AppStrings.of(context).insightWeeklyTable,
+      subtitle: AppStrings.of(context).insightWeeklyTableDesc,
       icon: Icons.table_chart_rounded,
       selector: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -12065,7 +13174,7 @@ class _InsightViewState extends State<InsightView> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '이번 주로',
+                          isKo ? '이번 주로' : 'This Week',
                           style: GoogleFonts.inter(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -12078,7 +13187,7 @@ class _InsightViewState extends State<InsightView> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${weekEntries.length}건의 기록',
+                  isKo ? '${weekEntries.length}건의 기록' : '${weekEntries.length} records',
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
                     color: appTextTertiary,
@@ -12155,7 +13264,9 @@ class _InsightViewState extends State<InsightView> {
                                       e.timestamp.month == dayDate.month &&
                                       e.timestamp.day == dayDate.day;
                                 },
-                                title: '${dayDate.year}년 ${dayDate.month}월 ${dayDate.day}일 (${weekdayLabels[i]})',
+                                title: isKo
+                                    ? '${dayDate.year}년 ${dayDate.month}월 ${dayDate.day}일 (${weekdayLabels[i]})'
+                                    : DateFormat('EEE, MMM d, yyyy').format(dayDate),
                               );
                             },
                             borderRadius: BorderRadius.circular(10),
@@ -12332,7 +13443,9 @@ class _InsightViewState extends State<InsightView> {
               const SizedBox(width: 5),
               Expanded(
                 child: Text(
-                  '시간 블록을 터치하면 해당 시간대의 상세 활동 내역을 볼 수 있습니다',
+                  isKo
+                      ? '시간 블록을 터치하면 해당 시간대의 상세 활동 내역을 볼 수 있습니다'
+                      : 'Tap a time block to view detailed activity',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     color: appTextTertiary,
@@ -12381,18 +13494,36 @@ class _InsightViewState extends State<InsightView> {
   }
 
   Widget _buildActivityCalendarCard(List<TimestampEntry> entries) {
+    final now = DateTime.now();
+    final bool isCurrentMonth = _calendarMonth.year == now.year &&
+        _calendarMonth.month == now.month;
+
     final monthEntries = entries.where((e) =>
         e.timestamp.year == _calendarMonth.year &&
         e.timestamp.month == _calendarMonth.month &&
         (_selectedGlobalCategory == 'All' || e.category == _selectedGlobalCategory)).toList();
 
+    final isKo = AppStrings.of(context).isKo;
     final int monthTotal = monthEntries.length;
-    final int monthDoneTodos = monthEntries.where((e) => e.status == 'done').length;
-    final int monthPendingTodos = monthEntries.where((e) => e.status == 'todo').length;
+    final int monthDoneTodos = entries.where((e) {
+      if (_selectedGlobalCategory != 'All' && e.category != _selectedGlobalCategory) return false;
+      if (e.status != 'done') return false;
+      final doneDate = e.doneTimestamp ?? e.timestamp;
+      return doneDate.year == _calendarMonth.year && doneDate.month == _calendarMonth.month;
+    }).length;
+
+    final int monthPendingTodos = entries.where((e) {
+      if (_selectedGlobalCategory != 'All' && e.category != _selectedGlobalCategory) return false;
+      if (!e.isPendingTodo) return false;
+      if (isCurrentMonth) return true;
+      final createdInMonth = e.timestamp.year == _calendarMonth.year && e.timestamp.month == _calendarMonth.month;
+      final dueInMonth = e.targetDate != null && e.targetDate!.year == _calendarMonth.year && e.targetDate!.month == _calendarMonth.month;
+      return createdInMonth || dueInMonth;
+    }).length;
 
     return _buildSectionCard(
-      title: '활동 캘린더',
-      subtitle: '월별 활동 일관성 및 날짜별 상세 기록을 확인합니다',
+      title: AppStrings.of(context).insightCalendar,
+      subtitle: AppStrings.of(context).insightCalendarDesc,
       icon: Icons.calendar_month_rounded,
       padding: const EdgeInsets.all(20),
       selector: Row(
@@ -12424,7 +13555,7 @@ class _InsightViewState extends State<InsightView> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '$monthTotal건 기록됨',
+                  isKo ? '$monthTotal건 기록됨' : '$monthTotal records',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -12463,14 +13594,14 @@ class _InsightViewState extends State<InsightView> {
               children: [
                 _buildMonthMetricItem(
                   icon: Icons.history_rounded,
-                  label: '처리한 TODO',
+                  label: isKo ? '처리한 TODO' : 'Completed',
                   value: '$monthDoneTodos',
                   color: const Color(0xFF10B981),
                 ),
                 Container(width: 1, height: 26, color: appBorder),
                 _buildMonthMetricItem(
                   icon: Icons.pending_actions_rounded,
-                  label: '남은 TODO',
+                  label: isKo ? '진행 중 TODO' : 'In Progress',
                   value: '$monthPendingTodos',
                   color: const Color(0xFFF59E0B),
                 ),
@@ -12563,7 +13694,7 @@ class _InsightViewState extends State<InsightView> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '인사이트',
+                                AppStrings.of(context).tabInsights,
                                 style: GoogleFonts.inter(
                                   fontSize: 18 * widget.uiScale,
                                   fontWeight: FontWeight.w800,
@@ -12573,7 +13704,9 @@ class _InsightViewState extends State<InsightView> {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                '시간 활용과 활동 패턴을 한눈에 분석하세요',
+                                AppStrings.of(context).isKo
+                                    ? '시간 활용과 활동 패턴을 한눈에 분석하세요'
+                                    : 'Analyze your time & activity patterns',
                                 style: GoogleFonts.inter(
                                   color: appTextTertiary,
                                   fontSize: 12.5 * widget.uiScale,
@@ -12587,7 +13720,7 @@ class _InsightViewState extends State<InsightView> {
                         const SizedBox(width: 12),
                         IconButton(
                           onPressed: () => _showCardCustomizationSheet(context),
-                          tooltip: '통계 카드 편집',
+                          tooltip: AppStrings.of(context).isKo ? '통계 카드 편집' : 'Edit insight cards',
                           icon: const Icon(Icons.dashboard_customize_rounded, size: 20),
                           color: isAppDark ? Colors.white70 : const Color(0xFF475569),
                           style: IconButton.styleFrom(
@@ -12673,6 +13806,9 @@ class _InsightViewState extends State<InsightView> {
     final startWeekday = firstDayOfMonth.weekday % 7;
     final totalSlots = startWeekday + daysInMonth;
 
+    final isKo = AppStrings.of(context).isKo;
+    final dayNames = isKo ? const ['일', '월', '화', '수', '목', '금', '토'] : const ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
       decoration: BoxDecoration(
@@ -12683,13 +13819,13 @@ class _InsightViewState extends State<InsightView> {
       child: Column(
         children: [
           Row(
-            children: ['일', '월', '화', '수', '목', '금', '토'].map((day) {
-              final isSun = day == '일';
-              final isSat = day == '토';
+            children: List.generate(7, (i) {
+              final isSun = i == 0;
+              final isSat = i == 6;
               return Expanded(
                 child: Center(
                   child: Text(
-                    day,
+                    dayNames[i],
                     style: GoogleFonts.inter(
                       color: isSun
                           ? const Color(0xFFEF4444).withOpacity(0.85)
@@ -12702,7 +13838,7 @@ class _InsightViewState extends State<InsightView> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ),
           const SizedBox(height: 16),
           GridView.builder(
@@ -12740,7 +13876,7 @@ class _InsightViewState extends State<InsightView> {
                         e.timestamp.day == currentDayDate.day;
                     if (createdOnDay) return true;
 
-                    final targetOnDay = e.status == 'todo' &&
+                    final targetOnDay = e.isPendingTodo &&
                         e.targetDate != null &&
                         e.targetDate!.year == currentDayDate.year &&
                         e.targetDate!.month == currentDayDate.month &&
@@ -12792,7 +13928,7 @@ class _InsightViewState extends State<InsightView> {
                               e.timestamp.day == currentDayDate.day;
                           if (sameCreated) return true;
 
-                          final sameTarget = e.status == 'todo' &&
+                          final sameTarget = e.isPendingTodo &&
                               e.targetDate != null &&
                               e.targetDate!.year == currentDayDate.year &&
                               e.targetDate!.month == currentDayDate.month &&
@@ -12808,7 +13944,9 @@ class _InsightViewState extends State<InsightView> {
 
                           return false;
                         },
-                        title: '${currentDayDate.year}년 ${currentDayDate.month}월 ${currentDayDate.day}일 ($w)',
+                        title: isKo
+                            ? '${currentDayDate.year}년 ${currentDayDate.month}월 ${currentDayDate.day}일 ($w)'
+                            : DateFormat('EEE, MMM d, yyyy').format(currentDayDate),
                       ).then((_) {
                         if (mounted) {
                           setState(() {
@@ -12867,7 +14005,7 @@ class _InsightViewState extends State<InsightView> {
   }) {
     final status = statusOverride ?? entry.status;
     final hsl = HSLColor.fromColor(baseColor);
-    if (status == 'todo') {
+    if (status == 'todo' || status == 'in_progress' || status == 'paused') {
       double factor;
       if (entry.targetDate != null) {
         final now = DateTime.now();
@@ -12924,13 +14062,13 @@ class _InsightViewState extends State<InsightView> {
         dayRecords.add({
           'entry': entry,
           'time': entry.timestamp,
-          'type': (entry.status == 'todo' || entry.status == 'done')
+          'type': entry.isAnyTodo
               ? 'todo_created'
               : 'moment',
         });
       }
 
-      final sameTarget = entry.status == 'todo' &&
+      final sameTarget = entry.isPendingTodo &&
           entry.targetDate != null &&
           entry.targetDate!.year == _selectedCalendarDay!.year &&
           entry.targetDate!.month == _selectedCalendarDay!.month &&
@@ -12999,7 +14137,7 @@ class _InsightViewState extends State<InsightView> {
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: Text(
-                  '이 날짜의 기록이 없습니다',
+                  AppStrings.of(context).isKo ? '이 날짜의 기록이 없습니다' : 'No records on this date',
                   style: GoogleFonts.inter(
                     color: appTextTertiary,
                     fontSize: 13,
@@ -13093,18 +14231,19 @@ class _InsightViewState extends State<InsightView> {
     final int duration = data['durationMinutes'] as int? ?? 0;
     final String metricType = data['metricType'] as String? ?? 'time';
 
+    final isKo = AppStrings.isCurrentLocaleKo;
     String subtitle;
     if (metricType == 'time') {
       if (duration > 0) {
-        subtitle = '${_formatMinutes(duration)} 소요 • $count건';
+        subtitle = isKo ? '${_formatMinutes(duration)} 소요 • $count건' : '${_formatMinutes(duration)} spent • $count items';
       } else {
-        subtitle = '소요 시간 없음 • $count건';
+        subtitle = isKo ? '소요 시간 없음 • $count건' : 'No elapsed time • $count items';
       }
     } else {
       if (duration > 0) {
-        subtitle = '$count건 기록 • ${_formatMinutes(duration)} 소요';
+        subtitle = isKo ? '$count건 기록 • ${_formatMinutes(duration)} 소요' : '$count records • ${_formatMinutes(duration)} spent';
       } else {
-        subtitle = '$count건 기록';
+        subtitle = isKo ? '$count건 기록' : '$count records';
       }
     }
 
@@ -13229,6 +14368,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isKo = AppStrings.of(context).isKo;
     final entry = widget.record['entry'] as TimestampEntry;
     final time = widget.record['time'] as DateTime;
     final type = widget.record['type'] as String;
@@ -13246,7 +14386,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
     if (type == 'done') {
       accentColor = adjustedColor;
       typeIcon = Icons.check_circle_outline_rounded;
-      typeLabel = '완료';
+      typeLabel = isKo ? '완료' : 'DONE';
     } else if (type == 'todo_created') {
       accentColor = adjustedColor;
       typeIcon = Icons.radio_button_unchecked_rounded;
@@ -13254,7 +14394,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
     } else if (type == 'todo_target') {
       accentColor = adjustedColor;
       typeIcon = Icons.flag_rounded;
-      typeLabel = '목표';
+      typeLabel = isKo ? '목표' : 'DUE';
     } else {
       accentColor = baseColor;
       typeIcon = Icons.fiber_manual_record_rounded;
@@ -13388,7 +14528,7 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                                 ),
                                 const SizedBox(width: 5),
                                 Text(
-                                  '완료 메모',
+                                  isKo ? '완료 메모' : 'Completion Note',
                                   style: GoogleFonts.inter(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
@@ -13424,7 +14564,9 @@ class _DetailRecordWidgetState extends State<_DetailRecordWidget> {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              '소요 시간: ${entry.computedDurationMinutes}분',
+                              isKo
+                                  ? '소요 시간: ${formatSecondsKo(entry.effectiveDurationSeconds)}'
+                                  : 'Duration: ${formatSecondsKo(entry.effectiveDurationSeconds)}',
                               style: GoogleFonts.jetBrainsMono(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
